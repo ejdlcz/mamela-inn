@@ -80,6 +80,7 @@
     box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
   }
   .focus-ring:focus-visible{ outline:2px solid var(--brass-bright); outline-offset:2px; }
+  button{ user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
   @media (prefers-reduced-motion: reduce){
     .anim-rise,.anim-toast{ animation:none !important; }
     *{ transition:none !important; }
@@ -121,6 +122,7 @@ const SparkIcon = (p) => <Icon {...p}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 
 const GridIcon = (p) => <Icon {...p}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></Icon>;
 const ListIcon = (p) => <Icon {...p}><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></Icon>;
 const CalendarIcon = (p) => <Icon {...p}><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></Icon>;
+const SwapIcon = (p) => <Icon {...p}><path d="M7 4 3 8l4 4"/><path d="M3 8h13"/><path d="M17 20l4-4-4-4"/><path d="M21 16H8"/></Icon>;
 
 /* ============================== HELPERS ============================== */
 const PHP = new Intl.NumberFormat('en-PH', { style:'currency', currency:'PHP', maximumFractionDigits:0 });
@@ -175,6 +177,18 @@ function browserDownload(filename, data, mime){
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(()=> URL.revokeObjectURL(url), 2000);
+}
+
+// Scales room-button size with both viewport width (via vw) and how many rooms
+// exist, so a handful of rooms don't look tiny/crowded on a wide desktop, and
+// a long room list doesn't force huge buttons that need excess scrolling.
+function roomGridColumns(roomCount){
+  let min = 150, max = 210;
+  if(roomCount > 24){ min = 105; max = 140; }
+  else if(roomCount > 16){ min = 120; max = 160; }
+  else if(roomCount > 10){ min = 135; max = 185; }
+  else if(roomCount <= 6){ min = 170; max = 260; }
+  return `repeat(auto-fill, minmax(clamp(${min}px, 11vw, ${max}px), 1fr))`;
 }
 
 const DEFAULT_ROOMS = Array.from({length:10}, (_,i)=>({
@@ -337,7 +351,7 @@ function RoomCard({ room, now, selectMode, selected, onToggleSelect, onOpen }){
         "hover:-translate-y-0.5 active:translate-y-1 " + bgClasses +
         (selected ? " ring-4 ring-[var(--brass-bright)] ring-offset-2 ring-offset-[var(--bg)]" : "")
       }
-      style={{ minHeight: '168px', boxShadow: edgeShadow + ", 0 10px 18px rgba(0,0,0,.28)" }}
+      style={{ minHeight: 'clamp(150px, 15vw, 200px)', boxShadow: edgeShadow + ", 0 10px 18px rgba(0,0,0,.28)" }}
       onMouseDown={(e)=>{ e.currentTarget.style.boxShadow = "0 1px 0 rgba(0,0,0,.3), 0 3px 8px rgba(0,0,0,.25)"; }}
       onMouseUp={(e)=>{ e.currentTarget.style.boxShadow = edgeShadow + ", 0 10px 18px rgba(0,0,0,.28)"; }}
       onMouseLeave={(e)=>{ e.currentTarget.style.boxShadow = edgeShadow + ", 0 10px 18px rgba(0,0,0,.28)"; }}
@@ -387,11 +401,30 @@ function Modal({ open, onClose, children, wide }){
 }
 
 /* ============================== GUEST INFO MODAL (occupied room) ============================== */
-function GuestInfoModal({ room, txn, onClose, onCheckout }){
+function GuestInfoModal({ room, txn, allRooms, onClose, onCheckout, onChangeRoom, onAddRoom }){
   const now = useNow(1000);
+  const [mode, setMode] = useState(null); // null | 'change' | 'add'
+  const [fromRoom, setFromRoom] = useState(null);
+  const [toRoom, setToRoom] = useState(null);
+  const [addRoomId, setAddRoomId] = useState(null);
+
+  useEffect(()=>{ setMode(null); setFromRoom(null); setToRoom(null); setAddRoomId(null); }, [room && room.id]);
+
   if(!room) return null;
   const msLeft = txn ? new Date(txn.timeOut).getTime() - now.getTime() : 0;
   const { overdue, h, m } = remaining(msLeft);
+  const vacantRooms = (allRooms||[]).filter(r=> r.status==='vacant');
+  const currentRoomIds = txn ? (txn.roomIds||[]) : [];
+
+  const confirmChange = () => {
+    if(!fromRoom || !toRoom) return;
+    onChangeRoom(txn, fromRoom, toRoom);
+  };
+  const confirmAdd = () => {
+    if(!addRoomId) return;
+    onAddRoom(txn, addRoomId);
+    setMode(null); setAddRoomId(null);
+  };
 
   return (
     <Modal open={!!room} onClose={onClose}>
@@ -415,13 +448,79 @@ function GuestInfoModal({ room, txn, onClose, onCheckout }){
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
               <div><dt style={{color:'var(--text-muted-c)'}}>Reference #</dt><dd className="font-semibold tabular">{txn.ref}</dd></div>
               <div><dt style={{color:'var(--text-muted-c)'}}>Guest name</dt><dd className="font-semibold">{txn.guestName}</dd></div>
-              <div><dt style={{color:'var(--text-muted-c)'}}>Rooms</dt><dd className="font-semibold">{(txn.roomIds||[]).join(', ')}</dd></div>
+              <div><dt style={{color:'var(--text-muted-c)'}}>Rooms</dt><dd className="font-semibold">{currentRoomIds.join(', ')}</dd></div>
               <div><dt style={{color:'var(--text-muted-c)'}}>Duration</dt><dd className="font-semibold">{txn.hours} hrs</dd></div>
               <div><dt style={{color:'var(--text-muted-c)'}}>Time in</dt><dd className="font-semibold">{fmtDateTime(txn.timeIn)}</dd></div>
               <div><dt style={{color:'var(--text-muted-c)'}}>Time out</dt><dd className="font-semibold">{fmtDateTime(txn.timeOut)}</dd></div>
               <div><dt style={{color:'var(--text-muted-c)'}}>Payment method</dt><dd className="font-semibold">{txn.paymentMethod}</dd></div>
               <div><dt style={{color:'var(--text-muted-c)'}}>Total paid</dt><dd className="font-semibold">{fmtMoney(txn.totalAmount)}</dd></div>
             </dl>
+
+            <div className="flex gap-2">
+              <button onClick={()=> setMode(m=> m==='change' ? null : 'change')}
+                className={"focus-ring flex-1 flex items-center justify-center gap-1.5 rounded-lg border py-2 text-sm font-semibold " + (mode==='change' ? "border-[var(--brass)] text-[var(--brass)]" : "")}
+                style={{borderColor: mode==='change' ? undefined : 'var(--line)'}}>
+                <SwapIcon size={15}/> Change Room
+              </button>
+              <button onClick={()=> setMode(m=> m==='add' ? null : 'add')}
+                className={"focus-ring flex-1 flex items-center justify-center gap-1.5 rounded-lg border py-2 text-sm font-semibold " + (mode==='add' ? "border-[var(--brass)] text-[var(--brass)]" : "")}
+                style={{borderColor: mode==='add' ? undefined : 'var(--line)'}}>
+                <PlusIcon size={15}/> Add Room
+              </button>
+            </div>
+
+            {mode==='change' && (
+              <div className="rounded-lg border p-3 space-y-3" style={{borderColor:'var(--line)'}}>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{color:'var(--text-muted-c)'}}>Move guest out of</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {currentRoomIds.map(rid=>(
+                      <button key={rid} type="button" onClick={()=>setFromRoom(rid)}
+                        className={"focus-ring px-3 py-1 rounded-full text-sm font-semibold border " + (fromRoom===rid ? "bg-[var(--brass)] border-[var(--brass-bright)] text-white" : "border-[var(--line)]")}>
+                        {rid}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{color:'var(--text-muted-c)'}}>Move into (vacant)</div>
+                  {vacantRooms.length===0 ? <div className="text-xs" style={{color:'var(--text-muted-c)'}}>No vacant rooms right now.</div> : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {vacantRooms.map(r=>(
+                        <button key={r.id} type="button" onClick={()=>setToRoom(r.id)}
+                          className={"focus-ring px-3 py-1 rounded-full text-sm font-semibold border " + (toRoom===r.id ? "bg-[var(--vacant)] border-[var(--vacant-bright)] text-white" : "border-[var(--line)]")}>
+                          {r.number}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button onClick={confirmChange} disabled={!fromRoom || !toRoom}
+                  className="focus-ring w-full rounded-lg bg-[var(--brass)] hover:bg-[var(--brass-bright)] disabled:opacity-40 text-white text-sm font-bold py-2">
+                  Confirm Room Change
+                </button>
+              </div>
+            )}
+
+            {mode==='add' && (
+              <div className="rounded-lg border p-3 space-y-3" style={{borderColor:'var(--line)'}}>
+                <div className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{color:'var(--text-muted-c)'}}>Add a vacant room to this stay</div>
+                {vacantRooms.length===0 ? <div className="text-xs" style={{color:'var(--text-muted-c)'}}>No vacant rooms right now.</div> : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {vacantRooms.map(r=>(
+                      <button key={r.id} type="button" onClick={()=>setAddRoomId(r.id)}
+                        className={"focus-ring px-3 py-1 rounded-full text-sm font-semibold border " + (addRoomId===r.id ? "bg-[var(--vacant)] border-[var(--vacant-bright)] text-white" : "border-[var(--line)]")}>
+                        {r.number}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button onClick={confirmAdd} disabled={!addRoomId}
+                  className="focus-ring w-full rounded-lg bg-[var(--brass)] hover:bg-[var(--brass-bright)] disabled:opacity-40 text-white text-sm font-bold py-2">
+                  Confirm Add Room
+                </button>
+              </div>
+            )}
 
             <button
               onClick={()=>onCheckout(txn)}
@@ -584,7 +683,8 @@ function TimePicker({ value, onChange }){
 }
 
 /* ============================== CHECK-IN MODAL ============================== */
-function CheckInModal({ open, initialRooms, allRooms, existingRefs, defaultRate, onClose, onConfirm }){
+function CheckInModal({ open, mode, initialRooms, allRooms, existingRefs, defaultRate, onClose, onConfirm }){
+  const isSchedule = mode === 'schedule';
   const [ref] = useState(()=> genReference(existingRefs));
   const [guestName, setGuestName] = useState('');
   const [roomIds, setRoomIds] = useState([]);
@@ -633,7 +733,7 @@ function CheckInModal({ open, initialRooms, allRooms, existingRefs, defaultRate,
       timeOut: timeOutIso,
       paymentMethod,
       totalAmount: Number(amount)||0,
-      status: 'active',
+      status: isSchedule ? 'scheduled' : 'active',
       createdAt: new Date().toISOString(),
     });
   };
@@ -643,8 +743,8 @@ function CheckInModal({ open, initialRooms, allRooms, existingRefs, defaultRate,
       <div className="flex-1 overflow-y-auto">
         <div className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 border-b flex items-start justify-between" style={{borderColor:'var(--line)'}}>
           <div>
-            <div className="text-xs uppercase tracking-wide font-semibold" style={{color:'var(--text-muted-c)'}}>New Check-In</div>
-            <div className="font-display text-2xl font-semibold">Guest Registration</div>
+            <div className="text-xs uppercase tracking-wide font-semibold" style={{color:'var(--text-muted-c)'}}>{isSchedule ? 'New Reservation' : 'New Check-In'}</div>
+            <div className="font-display text-2xl font-semibold">{isSchedule ? 'Schedule a Booking' : 'Guest Registration'}</div>
           </div>
           <button onClick={onClose} className="focus-ring p-2 rounded-lg hover:bg-black/10"><XIcon size={18}/></button>
         </div>
@@ -664,10 +764,13 @@ function CheckInModal({ open, initialRooms, allRooms, existingRefs, defaultRate,
 
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide" style={{color:'var(--text-muted-c)'}}>Room(s) Selected</label>
+            {isSchedule && (
+              <div className="mt-1 mb-2 text-xs" style={{color:'var(--text-muted-c)'}}>Any room can be booked ahead — double-check it's actually free for the scheduled date.</div>
+            )}
             <div className="mt-2 flex flex-wrap gap-2">
               {allRooms.map(r=>{
                 const active = roomIds.includes(r.id);
-                const disabled = r.status==='occupied' && !active;
+                const disabled = !isSchedule && r.status==='occupied' && !active;
                 return (
                   <button key={r.id} type="button" disabled={disabled}
                     onClick={()=> setRoomIds(ids => active ? ids.filter(x=>x!==r.id) : [...ids, r.id])}
@@ -710,11 +813,11 @@ function CheckInModal({ open, initialRooms, allRooms, existingRefs, defaultRate,
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wide" style={{color:'var(--text-muted-c)'}}>Date In</label>
+              <label className="text-xs font-semibold uppercase tracking-wide" style={{color:'var(--text-muted-c)'}}>{isSchedule ? 'Scheduled Date' : 'Date In'}</label>
               <div className="mt-1"><DatePicker value={timeInDate} onChange={setTimeInDate}/></div>
             </div>
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wide" style={{color:'var(--text-muted-c)'}}>Time In</label>
+              <label className="text-xs font-semibold uppercase tracking-wide" style={{color:'var(--text-muted-c)'}}>{isSchedule ? 'Scheduled Time' : 'Time In'}</label>
               <div className="mt-1"><TimePicker value={timeInDate} onChange={setTimeInDate}/></div>
             </div>
           </div>
@@ -744,7 +847,7 @@ function CheckInModal({ open, initialRooms, allRooms, existingRefs, defaultRate,
 
           <button onClick={submit}
             className="focus-ring w-full flex items-center justify-center gap-2 rounded-lg bg-[var(--brass)] hover:bg-[var(--brass-bright)] text-white font-bold py-3 transition-colors">
-            <LogInIcon size={18}/> Confirm Check-In
+            {isSchedule ? <CalendarIcon size={18}/> : <LogInIcon size={18}/>} {isSchedule ? 'Save Reservation' : 'Confirm Check-In'}
           </button>
         </div>
       </div>
@@ -759,6 +862,7 @@ function FrontDesk({ dbApi, pushToast }){
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState([]);
   const [checkInOpen, setCheckInOpen] = useState(false);
+  const [checkInMode, setCheckInMode] = useState('checkin');
   const [checkInRooms, setCheckInRooms] = useState([]);
   const [infoRoom, setInfoRoom] = useState(null);
 
@@ -768,9 +872,13 @@ function FrontDesk({ dbApi, pushToast }){
     txns.filter(t=>t.status==='active').forEach(t=> (t.roomIds||[]).forEach(rid=> map[rid]=t));
     return map;
   },[txns]);
+  const reservations = useMemo(()=>
+    txns.filter(t=>t.status==='scheduled').sort((a,b)=> new Date(a.timeIn) - new Date(b.timeIn))
+  ,[txns]);
 
   const openRoom = (room) => {
     if(room.status==='occupied'){ setInfoRoom(room); return; }
+    setCheckInMode('checkin');
     setCheckInRooms([room.id]);
     setCheckInOpen(true);
   };
@@ -781,13 +889,25 @@ function FrontDesk({ dbApi, pushToast }){
 
   const startMultiCheckIn = () => {
     if(selected.length===0) return;
+    setCheckInMode('checkin');
     setCheckInRooms(selected);
+    setCheckInOpen(true);
+  };
+
+  const openSchedule = () => {
+    setCheckInMode('schedule');
+    setCheckInRooms([]);
     setCheckInOpen(true);
   };
 
   const confirmCheckIn = async (txn) => {
     try{
       await dbApi.saveTxn(txn);
+      if(txn.status==='scheduled'){
+        setCheckInOpen(false);
+        pushToast(`Reservation saved for ${txn.guestName} — ${fmtDateTime(txn.timeIn)} · ${txn.ref}`);
+        return;
+      }
       for(const rid of txn.roomIds){
         const room = rooms.find(r=>r.id===rid);
         await dbApi.saveRoom({
@@ -817,6 +937,62 @@ function FrontDesk({ dbApi, pushToast }){
     }
   };
 
+  const activateReservation = async (txn) => {
+    const busy = txn.roomIds.filter(rid => { const r = rooms.find(x=>x.id===rid); return r && r.status==='occupied'; });
+    if(busy.length){ pushToast(`Room ${busy.join(', ')} is currently occupied — can't check in yet.`, 'error'); return; }
+    try{
+      const timeIn = new Date();
+      const timeOut = new Date(timeIn.getTime() + Number(txn.hours||0)*3600000).toISOString();
+      const nextTxn = { ...txn, timeIn: timeIn.toISOString(), timeOut, status:'active' };
+      await dbApi.saveTxn(nextTxn);
+      for(const rid of txn.roomIds){
+        const room = rooms.find(r=>r.id===rid);
+        await dbApi.saveRoom({ ...(room||{id:rid, number:rid, rate: dbApi.settings.defaultRate}), status:'occupied', txnId: txn.ref, guestName: txn.guestName, timeOut });
+      }
+      pushToast(`${txn.guestName} checked in from reservation — ${txn.roomIds.join(', ')}.`);
+    }catch(e){
+      pushToast('Could not check in this reservation.', 'error');
+    }
+  };
+
+  const cancelReservation = async (txn) => {
+    try{
+      await dbApi.saveTxn({ ...txn, status:'cancelled' });
+      pushToast(`Reservation for ${txn.guestName} cancelled.`);
+    }catch(e){
+      pushToast('Could not cancel reservation.', 'error');
+    }
+  };
+
+  const changeRoom = async (txn, fromId, toId) => {
+    const toRoomObj = rooms.find(r=>r.id===toId);
+    if(!toRoomObj || toRoomObj.status!=='vacant'){ pushToast('That room is no longer vacant.', 'error'); return; }
+    try{
+      const nextRoomIds = (txn.roomIds||[]).map(id=> id===fromId ? toId : id);
+      await dbApi.saveTxn({ ...txn, roomIds: nextRoomIds });
+      const fromRoomObj = rooms.find(r=>r.id===fromId);
+      if(fromRoomObj) await dbApi.saveRoom({ ...fromRoomObj, status:'vacant', txnId:null, guestName:null, timeOut:null });
+      await dbApi.saveRoom({ ...toRoomObj, status:'occupied', txnId: txn.ref, guestName: txn.guestName, timeOut: txn.timeOut });
+      setInfoRoom(null);
+      pushToast(`Moved ${txn.guestName} from Room ${fromId} to Room ${toId}.`);
+    }catch(e){
+      pushToast('Room change failed. Please try again.', 'error');
+    }
+  };
+
+  const addRoomToTxn = async (txn, roomId) => {
+    const roomObj = rooms.find(r=>r.id===roomId);
+    if(!roomObj || roomObj.status!=='vacant'){ pushToast('That room is no longer vacant.', 'error'); return; }
+    try{
+      const nextRoomIds = [...(txn.roomIds||[]), roomId];
+      await dbApi.saveTxn({ ...txn, roomIds: nextRoomIds });
+      await dbApi.saveRoom({ ...roomObj, status:'occupied', txnId: txn.ref, guestName: txn.guestName, timeOut: txn.timeOut });
+      pushToast(`Room ${roomId} added to ${txn.guestName}'s stay.`);
+    }catch(e){
+      pushToast('Could not add room. Please try again.', 'error');
+    }
+  };
+
   const vacantCount = rooms.filter(r=>r.status==='vacant').length;
   const occupiedCount = rooms.length - vacantCount;
 
@@ -827,13 +1003,17 @@ function FrontDesk({ dbApi, pushToast }){
           <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[var(--vacant-bright)]"></span>{vacantCount} vacant</div>
           <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[var(--occupied-bright)]"></span>{occupiedCount} occupied</div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {selectMode && selected.length>0 && (
             <button onClick={startMultiCheckIn}
               className="focus-ring flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--brass)] hover:bg-[var(--brass-bright)] text-white font-semibold text-sm">
               <LogInIcon size={16}/> Check In Selected ({selected.length})
             </button>
           )}
+          <button onClick={openSchedule}
+            className="focus-ring flex items-center gap-2 px-4 py-2 rounded-lg border font-semibold text-sm hover:border-[var(--brass-bright)]" style={{borderColor:'var(--line)'}}>
+            <CalendarIcon size={16}/> Schedule a Booking
+          </button>
           <button onClick={()=>{ setSelectMode(s=>!s); setSelected([]); }}
             className={
               "focus-ring flex items-center gap-2 px-4 py-2 rounded-lg border font-semibold text-sm transition-colors " +
@@ -844,7 +1024,7 @@ function FrontDesk({ dbApi, pushToast }){
         </div>
       </div>
 
-      <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns:'repeat(auto-fill, minmax(135px, 1fr))' }}>
+      <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: roomGridColumns(rooms.length) }}>
         {rooms.map(room=>(
           <RoomCard key={room.id} room={room} now={now}
             selectMode={selectMode} selected={selected.includes(room.id)}
@@ -852,14 +1032,50 @@ function FrontDesk({ dbApi, pushToast }){
         ))}
       </div>
 
-      <GuestInfoModal room={infoRoom} txn={infoRoom ? activeTxnByRoom[infoRoom.id] : null}
-        onClose={()=>setInfoRoom(null)} onCheckout={checkout}/>
+      {reservations.length>0 && (
+        <div className="mt-8">
+          <h3 className="font-display text-lg font-semibold mb-3 flex items-center gap-2"><CalendarIcon size={18} style={{color:'var(--brass)'}}/> Upcoming Reservations</h3>
+          <div className="space-y-2.5">
+            {reservations.map(t=>(
+              <div key={t.ref} className="rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between" style={{borderColor:'var(--line)', background:'var(--panel)'}}>
+                <div className="min-w-0">
+                  <div className="font-semibold truncate">{t.guestName} <span className="font-normal" style={{color:'var(--text-muted-c)'}}>· Room {t.roomIds.join(', ')}</span></div>
+                  <div className="text-xs tabular mt-0.5" style={{color:'var(--text-muted-c)'}}>{fmtDateTime(t.timeIn)} · {t.hours}h · {t.ref}</div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button onClick={()=>activateReservation(t)}
+                    className="focus-ring flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--brass)] hover:bg-[var(--brass-bright)] text-white text-xs font-bold">
+                    <LogInIcon size={14}/> Check In Now
+                  </button>
+                  <button onClick={()=>cancelReservation(t)}
+                    className="focus-ring flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold text-[var(--overdue-bright)]" style={{borderColor:'var(--line)'}}>
+                    <XIcon size={14}/> Cancel
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-      <CheckInModal open={checkInOpen} initialRooms={checkInRooms} allRooms={rooms}
+      <GuestInfoModal room={infoRoom} txn={infoRoom ? activeTxnByRoom[infoRoom.id] : null} allRooms={rooms}
+        onClose={()=>setInfoRoom(null)} onCheckout={checkout} onChangeRoom={changeRoom} onAddRoom={addRoomToTxn}/>
+
+      <CheckInModal open={checkInOpen} mode={checkInMode} initialRooms={checkInRooms} allRooms={rooms}
         existingRefs={existingRefs} defaultRate={dbApi.settings.defaultRate}
         onClose={()=>setCheckInOpen(false)} onConfirm={confirmCheckIn}/>
     </div>
   );
+}
+
+function statusLabel(status){
+  return status==='active' ? 'Active' : status==='scheduled' ? 'Scheduled' : status==='cancelled' ? 'Cancelled' : 'Completed';
+}
+function statusBadgeClasses(status){
+  if(status==='active') return "bg-[var(--occupied)]/20 text-[var(--occupied-bright)]";
+  if(status==='scheduled') return "bg-[var(--brass)]/20 text-[var(--brass-bright)]";
+  if(status==='cancelled') return "bg-[var(--overdue)]/20 text-[var(--overdue-bright)]";
+  return "bg-[var(--vacant)]/20 text-[var(--vacant-bright)]";
 }
 
 /* ============================== OWNER: LEDGER ============================== */
@@ -932,7 +1148,9 @@ function Ledger({ dbApi, pushToast }){
             className="focus-ring px-3 py-2 rounded-lg border bg-transparent outline-none text-sm" style={{borderColor:'var(--line)'}}>
             <option value="all" style={{color:'#111'}}>All statuses</option>
             <option value="active" style={{color:'#111'}}>Active</option>
+            <option value="scheduled" style={{color:'#111'}}>Scheduled</option>
             <option value="completed" style={{color:'#111'}}>Completed</option>
+            <option value="cancelled" style={{color:'#111'}}>Cancelled</option>
           </select>
           <select value={paymentFilter} onChange={e=>setPaymentFilter(e.target.value)}
             className="focus-ring px-3 py-2 rounded-lg border bg-transparent outline-none text-sm" style={{borderColor:'var(--line)'}}>
@@ -975,9 +1193,8 @@ function Ledger({ dbApi, pushToast }){
                   <td className="px-4 py-3">{t.paymentMethod}</td>
                   <td className="px-4 py-3 tabular font-semibold">{fmtMoney(t.totalAmount)}</td>
                   <td className="px-4 py-3">
-                    <span className={"px-2 py-0.5 rounded-full text-xs font-semibold " +
-                      (t.status==='active' ? "bg-[var(--occupied)]/20 text-[var(--occupied-bright)]" : "bg-[var(--vacant)]/20 text-[var(--vacant-bright)]")}>
-                      {t.status==='active' ? 'Active' : 'Completed'}
+                    <span className={"px-2 py-0.5 rounded-full text-xs font-semibold " + statusBadgeClasses(t.status)}>
+                      {statusLabel(t.status)}
                     </span>
                   </td>
                 </tr>
@@ -1000,7 +1217,9 @@ function Reports({ dbApi, pushToast }){
     return txns.filter(t=> new Date(t.createdAt||t.timeIn).getTime() >= cutoff);
   },[txns]);
 
-  const totalRevenue7 = last7.reduce((s,t)=> s + (Number(t.totalAmount)||0), 0);
+  const totalRevenue7 = last7
+    .filter(t=> t.status!=='scheduled' && t.status!=='cancelled')
+    .reduce((s,t)=> s + (Number(t.totalAmount)||0), 0);
 
   const generateNow = () => {
     try{
@@ -1015,7 +1234,6 @@ function Reports({ dbApi, pushToast }){
       browserDownload(`weekly-report-${new Date().toISOString().slice(0,10)}.xlsx`, buf, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       pushToast('Weekly report generated.');
     }catch(e){
-      if(e && e.code==='declined') return;
       pushToast('Report generation failed.', 'error');
     }
   };
@@ -1344,10 +1562,7 @@ function LandingPage({ innName, tagline, onFrontDesk, onOwnerLogin, theme, toggl
             className="focus-ring w-full flex items-center gap-4 rounded-2xl border-2 p-5 text-left transition-all hover:-translate-y-0.5"
             style={{ borderColor:'var(--line)', background:'var(--panel)' }}>
             <div className="p-3 rounded-xl" style={{background:'rgba(184,66,15,.12)', color:'var(--brass)'}}><KeyIcon size={24}/></div>
-            <div className="flex-1">
-              <div className="font-display text-lg font-semibold">Front Desk</div>
-              <div className="text-sm" style={{color:'var(--text-muted-c)'}}>Check guests in and out — no login needed</div>
-            </div>
+            <div className="flex-1 font-display text-lg font-semibold">Front Desk</div>
             <ChevronR size={20} style={{color:'var(--text-muted-c)'}}/>
           </button>
 
@@ -1356,10 +1571,7 @@ function LandingPage({ innName, tagline, onFrontDesk, onOwnerLogin, theme, toggl
               className="focus-ring w-full flex items-center gap-4 rounded-2xl border-2 p-5 text-left transition-all hover:-translate-y-0.5"
               style={{ borderColor:'var(--line)', background:'var(--panel)' }}>
               <div className="p-3 rounded-xl" style={{background:'rgba(184,66,15,.12)', color:'var(--brass)'}}><SettingsIcon size={24}/></div>
-              <div className="flex-1">
-                <div className="font-display text-lg font-semibold">Owner</div>
-                <div className="text-sm" style={{color:'var(--text-muted-c)'}}>Sign in to view the dashboard and reports</div>
-              </div>
+              <div className="flex-1 font-display text-lg font-semibold">Owner</div>
               <ChevronR size={20} style={{color:'var(--text-muted-c)'}}/>
             </button>
           ) : (
@@ -1368,6 +1580,9 @@ function LandingPage({ innName, tagline, onFrontDesk, onOwnerLogin, theme, toggl
                 <div className="p-2 rounded-lg" style={{background:'rgba(184,66,15,.12)', color:'var(--brass)'}}><LockIcon size={16}/></div>
                 <div className="font-display text-base font-semibold">Owner sign-in</div>
               </div>
+              <div className="mb-3 text-xs rounded-lg px-3 py-2 border" style={{borderColor:'var(--brass)', color:'var(--brass)', background:'rgba(184,66,15,.08)'}}>
+                Temporary access — username <strong>owner</strong>, password <strong>123</strong>
+              </div>
               <div className="space-y-3">
                 <input autoFocus value={username} onChange={e=>setUsername(e.target.value)} placeholder="Username"
                   className="focus-ring w-full px-3 py-2.5 rounded-lg border bg-transparent outline-none text-sm" style={{borderColor:'var(--line)'}}/>
@@ -1375,7 +1590,6 @@ function LandingPage({ innName, tagline, onFrontDesk, onOwnerLogin, theme, toggl
                   className="focus-ring w-full px-3 py-2.5 rounded-lg border bg-transparent outline-none text-sm" style={{borderColor:'var(--line)'}}/>
               </div>
               {error && <div className="mt-2 text-sm text-[var(--overdue-bright)] flex items-center gap-1.5"><AlertIcon size={14}/>{error}</div>}
-              <div className="mt-2 text-xs" style={{color:'var(--text-muted-c)'}}>Temporary access — username <strong>owner</strong>, password <strong>123</strong></div>
               <div className="mt-4 flex gap-2">
                 <button type="button" onClick={()=>{ setOwnerOpen(false); setError(''); }}
                   className="focus-ring flex-1 px-4 py-2.5 rounded-lg border text-sm font-semibold" style={{borderColor:'var(--line)'}}>Cancel</button>
@@ -1435,7 +1649,7 @@ function App(){
         )}
       </main>
       <div className="max-w-7xl mx-auto px-5 pb-6 text-xs" style={{color:'var(--text-muted-c)'}}>
-        Data is saved in this browser's storage only (not shared across devices). For multi-device, real-time data, connect this app to Supabase — see the included README.
+        Data is saved in this browser's storage only (not shared across devices). For multi-device, real-time data, connect this app to Supabase.
       </div>
       {toastView}
     </div>
