@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+  body {
+    @apply bg-base font-sans text-ink antialiased;
+  }
+  /* Smooth fade when switching day / night mode */
+  *,
+  *::before,
+  *::after {
+    transition:
+      background-color 0.7s ease,
+      border-color 0.7s ease,
+      color 0.7s ease;
+  }
+  /* Buttons and their text should never be highlightable */
+  button {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  /* Hide the browser's native number spinners */
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+}
+
+/*
+  Reusable building blocks. Restyle these once and every screen follows.
+*/
+@layer components {
+  .label {
+    @apply text-xs font-semibold uppercase tracking-wide text-muted;
+  }
+  .field {
+    @apply w-full rounded-lg border border-line bg-transparent px-3 py-2 outline-none focus-visible:border-brand;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-bright disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply btn bg-brand font-bold text-white hover:bg-brand-bright;
+  }
+  .btn-outline {
+    @apply btn border border-line hover:border-brand-bright;
+  }
+  .btn-success {
+    @apply btn bg-vacant font-semibold text-white hover:bg-vacant-bright;
+  }
+  .card {
+    @apply rounded-xl border border-line bg-surface;
+  }
+  .chip {
+    @apply rounded-full border border-line px-3 py-1.5 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-bright;
+  }
+  .chip-active {
+    @apply border-brand-bright bg-brand text-white;
+  }
+  /* Little "key ring hole" on the room buttons */
+  .key-tag::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.18);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+  }
+}

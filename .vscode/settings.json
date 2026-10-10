@@ -1,0 +1,13 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "files.associations": { "*.css": "tailwindcss" },
+  "css.lint.unknownAtRules": "ignore",
+  "editor.quickSuggestions": { "strings": "on" },
+
+  // Only the Edge Function folder is treated as Deno (needs the Deno extension).
+  "deno.enablePaths": ["supabase/functions"],
+  "[typescript][javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" }
+}

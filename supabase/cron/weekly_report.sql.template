@@ -1,0 +1,26 @@
+-- OPTIONAL: schedule the weekly email from SQL instead of the dashboard UI.
+-- Copy this to a scratch SQL Editor tab, replace the two placeholders, run it.
+-- NEVER commit your real service key to git.
+--
+-- Needs the "pg_cron" and "pg_net" extensions
+-- (Dashboard -> Database -> Extensions -> enable both).
+--
+-- Cron runs in UTC. '0 1 * * 1' = every Monday 01:00 UTC = 9:00 AM Philippine time.
+
+select cron.schedule(
+  'weekly-report',
+  '0 1 * * 1',
+  $$
+  select net.http_post(
+    url     := 'https://YOUR-PROJECT-REF.supabase.co/functions/v1/weekly-report',
+    headers := jsonb_build_object(
+      'Content-Type',  'application/json',
+      'Authorization', 'Bearer YOUR-SERVICE-ROLE-KEY'
+    ),
+    body    := '{}'::jsonb
+  );
+  $$
+);
+
+-- To remove the schedule later:
+--   select cron.unschedule('weekly-report');

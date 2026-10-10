@@ -1,0 +1,7 @@
+# Minimal Supabase CLI config. If the CLI complains, delete this file and run
+# `supabase init` once, then keep the migrations/ and functions/ folders.
+project_id = "mamelas-inn"
+
+[functions.weekly-report]
+# Callers must send a valid Supabase JWT (the anon or service key).
+verify_jwt = true

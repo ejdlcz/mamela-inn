@@ -1,0 +1,34 @@
+/*
+  THEME TOKENS — change the look of the whole app from here.
+  Values are "R G B" triplets so Tailwind can apply opacity (e.g. bg-brand/20).
+  Night mode overrides live in the [data-theme='dark'] block.
+*/
+:root {
+  --c-base: 255 255 255; /* page background */
+  --c-surface: 255 255 255; /* cards, modals, header */
+  --c-line: 232 225 214; /* borders */
+  --c-ink: 35 26 18; /* main text */
+  --c-muted: 107 97 86; /* secondary text */
+
+  --c-brand: 184 66 15; /* Mamela's rust orange */
+  --c-brand-bright: 224 103 43;
+
+  --c-vacant: 62 107 73;
+  --c-vacant-bright: 92 145 105;
+  --c-occupied: 140 90 29;
+  --c-occupied-bright: 185 133 48;
+  --c-overdue: 156 58 46;
+  --c-overdue-bright: 194 87 74;
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --c-base: 24 19 16;
+  --c-surface: 33 26 21;
+  --c-line: 76 60 41;
+  --c-ink: 243 236 227;
+  --c-muted: 185 170 152;
+
+  color-scheme: dark;
+}
