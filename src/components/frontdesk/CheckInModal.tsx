@@ -1,6 +1,7 @@
-import { AlertTriangle, CalendarPlus, LogIn, X } from 'lucide-react';
+import { AlertTriangle, CalendarPlus, Clock, LogIn, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { DURATION_PRESETS, PAYMENT_METHODS } from '../../config/defaults';
+import { useNow } from '../../hooks/useNow';
 import { findConflict } from '../../lib/bookings';
 import { fmtDateTime, fmtMoney } from '../../lib/format';
 import { genReference } from '../../lib/ids';
@@ -35,6 +36,7 @@ export default function CheckInModal({
   onConfirm,
 }: CheckInModalProps) {
   const isSchedule = mode === 'schedule';
+  const now = useNow(isSchedule ? 3_600_000 : 1000);
 
   const [ref] = useState(() => genReference(new Set(txns.map((t) => t.ref))));
   const [guestName, setGuestName] = useState('');
@@ -56,9 +58,12 @@ export default function CheckInModal({
     if (!amountEdited) setAmount(String(suggested));
   }, [suggested, amountEdited]);
 
+  // "Check in now" always starts at the current time (the clerk can't change it).
+  // A reservation starts at the date and time picked in the form.
+  const start = isSchedule ? timeIn : now;
   const timeOut = useMemo(
-    () => new Date(timeIn.getTime() + hoursNum * 3_600_000),
-    [timeIn, hoursNum],
+    () => new Date(start.getTime() + hoursNum * 3_600_000),
+    [start, hoursNum],
   );
 
   const toggleRoom = (id: string) =>
@@ -69,7 +74,10 @@ export default function CheckInModal({
     if (roomIds.length === 0) return setError('Select at least one room.');
     if (hoursNum <= 0) return setError('Duration must be greater than zero.');
 
-    const conflict = findConflict(txns, roomIds, timeIn, timeOut);
+    const startAt = isSchedule ? timeIn : new Date(); // exact moment of confirming
+    const endAt = new Date(startAt.getTime() + hoursNum * 3_600_000);
+
+    const conflict = findConflict(txns, roomIds, startAt, endAt);
     if (conflict) {
       return setError(
         `Room ${conflict.roomId} is already booked for ${conflict.guestName} ` +
@@ -83,8 +91,8 @@ export default function CheckInModal({
       guestName: guestName.trim(),
       roomIds,
       hours: hoursNum,
-      timeIn: timeIn.toISOString(),
-      timeOut: timeOut.toISOString(),
+      timeIn: startAt.toISOString(),
+      timeOut: endAt.toISOString(),
       paymentMethod,
       totalAmount: Number(amount) || 0,
       status: isSchedule ? 'scheduled' : 'active',
@@ -171,7 +179,7 @@ export default function CheckInModal({
                     key={h}
                     type="button"
                     onClick={() => setHours(String(h))}
-                    className="rounded-md border border-line px-2 py-1 text-xs hover:border-brand-bright"
+                    className="min-h-11 min-w-14 rounded-lg border border-line px-3 text-sm font-semibold hover:border-brand-bright sm:min-h-0 sm:min-w-0 sm:rounded-md sm:px-2 sm:py-1 sm:text-xs sm:font-normal"
                   >
                     {h}h
                   </button>
@@ -195,14 +203,23 @@ export default function CheckInModal({
             </Field>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label={isSchedule ? 'Scheduled Date' : 'Date In'}>
-              <DatePicker value={timeIn} onChange={setTimeIn} />
+          {isSchedule ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Scheduled Date">
+                <DatePicker value={timeIn} onChange={setTimeIn} />
+              </Field>
+              <Field label="Scheduled Time">
+                <TimePicker value={timeIn} onChange={setTimeIn} />
+              </Field>
+            </div>
+          ) : (
+            <Field label="Time In">
+              <div className="flex items-center gap-2 rounded-lg border border-line px-3 py-2.5 tabular-nums">
+                <Clock size={16} className="shrink-0 text-brand" />
+                <span>Now · {fmtDateTime(now.toISOString())}</span>
+              </div>
             </Field>
-            <Field label={isSchedule ? 'Scheduled Time' : 'Time In'}>
-              <TimePicker value={timeIn} onChange={setTimeIn} />
-            </Field>
-          </div>
+          )}
 
           <Field label="Date & Time Out (auto)">
             <div className="rounded-lg border border-line px-3 py-2.5 tabular-nums text-muted">

@@ -8,6 +8,10 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      screens: {
+        // Portrait phones. Keep in sync with PHONE_QUERY in src/hooks/useMediaQuery.ts
+        phone: { raw: '(max-width: 639px) and (orientation: portrait)' },
+      },
       colors: {
         base: color('base'),
         surface: color('surface'),

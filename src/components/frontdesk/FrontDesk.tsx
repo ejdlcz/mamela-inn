@@ -1,12 +1,15 @@
-import { CalendarPlus, LayoutGrid, LogIn } from 'lucide-react';
+import { Calendar, LayoutGrid, LogIn, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useIsNarrow } from '../../hooks/useMediaQuery';
 import { useNow } from '../../hooks/useNow';
 import { useToast } from '../../hooks/useToast';
 import type { InnData } from '../../hooks/useInnData';
 import { findConflict } from '../../lib/bookings';
 import { fmtDateTime } from '../../lib/format';
-import { roomGridColumns } from '../../lib/layout';
+import { phoneGridColumns, roomGridColumns } from '../../lib/layout';
 import type { Room, Transaction } from '../../types';
+import Modal from '../ui/Modal';
+import BookingChoiceModal from './BookingChoiceModal';
 import CheckInModal from './CheckInModal';
 import GuestInfoModal from './GuestInfoModal';
 import ReservationsList from './ReservationsList';
@@ -17,6 +20,7 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : 'Please try aga
 export default function FrontDesk({ data }: { data: InnData }) {
   const toast = useToast();
   const now = useNow(1000);
+  const narrow = useIsNarrow();
   const { rooms, txns, settings } = data;
 
   const [selectMode, setSelectMode] = useState(false);
@@ -25,6 +29,9 @@ export default function FrontDesk({ data }: { data: InnData }) {
     mode: 'checkin' | 'schedule';
     roomIds: string[];
   }>(null);
+  /** rooms waiting for the "Check in now / Schedule a booking" choice */
+  const [choice, setChoice] = useState<string[] | null>(null);
+  const [showScheduled, setShowScheduled] = useState(false);
   const [infoRoomId, setInfoRoomId] = useState<string | null>(null);
 
   const activeTxnByRoom = useMemo(() => {
@@ -79,7 +86,7 @@ export default function FrontDesk({ data }: { data: InnData }) {
   /* ---- actions ------------------------------------------------------------ */
   const openRoom = (room: Room) => {
     if (room.status === 'occupied') setInfoRoomId(room.id);
-    else setBooking({ mode: 'checkin', roomIds: [room.id] });
+    else setChoice([room.id]);
   };
 
   const toggleSelect = (id: string) =>
@@ -92,10 +99,10 @@ export default function FrontDesk({ data }: { data: InnData }) {
         toast(`Reservation saved for ${txn.guestName} — ${fmtDateTime(txn.timeIn)} · ${txn.ref}`);
       } else {
         await occupy(txn, txn.roomIds);
-        setSelected([]);
-        setSelectMode(false);
         toast(`Checked in ${txn.guestName} — ${txn.roomIds.join(', ')} · ${txn.ref}`);
       }
+      setSelected([]);
+      setSelectMode(false);
       setBooking(null);
     } catch (e) {
       toast(`Could not save the booking. ${errMsg(e)}`, 'error');
@@ -202,76 +209,142 @@ export default function FrontDesk({ data }: { data: InnData }) {
   /* ---- render ------------------------------------------------------------- */
   const vacantCount = rooms.filter((r) => r.status === 'vacant').length;
 
-  return (
-    <div>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4 text-sm">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-vacant-bright" />
-            {vacantCount} vacant
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-occupied-bright" />
-            {rooms.length - vacantCount} occupied
-          </span>
-        </div>
+  const reservationList = (afterCheckIn?: () => void) => (
+    <ReservationsList
+      reservations={reservations}
+      now={now}
+      onCheckIn={async (t) => {
+        await activateReservation(t);
+        afterCheckIn?.();
+      }}
+      onCancel={cancelReservation}
+    />
+  );
 
-        <div className="flex flex-wrap items-center gap-2">
+  return (
+    <div className="flex min-h-0 flex-1 gap-4">
+      {/* ---- rooms ---- */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-5">
+          <div className="flex items-center gap-3 text-xs sm:mr-auto sm:gap-4 sm:text-sm">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-vacant-bright" />
+              {vacantCount} vacant
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-occupied-bright" />
+              {rooms.length - vacantCount} occupied
+            </span>
+          </div>
+
           {selectMode && selected.length > 0 && (
-            <button
-              onClick={() => setBooking({ mode: 'checkin', roomIds: selected })}
-              className="btn-primary"
-            >
-              <LogIn size={16} /> Check In Selected ({selected.length})
+            <button onClick={() => setChoice(selected)} className="btn-primary ml-auto sm:ml-0">
+              <LogIn size={16} /> Book Selected ({selected.length})
             </button>
           )}
-          <button
-            onClick={() => setBooking({ mode: 'schedule', roomIds: [] })}
-            className="btn-outline"
-          >
-            <CalendarPlus size={16} /> Schedule a Booking
-          </button>
-          <button
-            onClick={() => {
-              setSelectMode((s) => !s);
-              setSelected([]);
-            }}
-            className={selectMode ? 'btn-primary' : 'btn-outline'}
-          >
-            <LayoutGrid size={16} /> Multi-Room Select Mode {selectMode ? 'On' : 'Off'}
-          </button>
+
+          <div className="flex w-full gap-2 sm:w-auto">
+            <button
+              onClick={() => {
+                setSelectMode((s) => !s);
+                setSelected([]);
+              }}
+              className={
+                (selectMode ? 'btn-primary' : 'btn-outline') + ' h-11 flex-1 sm:h-auto sm:flex-none'
+              }
+            >
+              <LayoutGrid size={16} /> Multi-Room Select Mode {selectMode ? 'On' : 'Off'}
+            </button>
+            {/* Phones only: the scheduled list lives in a pop-up so it never crowds the rooms */}
+            <button
+              onClick={() => setShowScheduled(true)}
+              className="btn-outline h-11 flex-1 sm:hidden"
+            >
+              <Calendar size={16} /> Scheduled ({reservations.length})
+            </button>
+          </div>
         </div>
+
+        {rooms.length === 0 ? (
+          <div className="card p-10 text-center text-muted">
+            No rooms are set up yet. The owner can add rooms in Owner Dashboard → Admin Settings.
+          </div>
+        ) : (
+          <div
+            // On a portrait phone the grid fills the leftover screen height (rows share it
+            // equally), so the page itself never scrolls.
+            className="grid min-h-0 gap-2 phone:flex-1 phone:auto-rows-fr sm:gap-4"
+            style={{
+              gridTemplateColumns: narrow
+                ? phoneGridColumns(rooms.length)
+                : roomGridColumns(rooms.length),
+            }}
+          >
+            {rooms.map((room) => (
+              <RoomCard
+                key={room.id}
+                room={room}
+                now={now}
+                compact={narrow}
+                selectMode={selectMode}
+                selected={selected.includes(room.id)}
+                onToggleSelect={toggleSelect}
+                onOpen={openRoom}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {rooms.length === 0 ? (
-        <div className="card p-10 text-center text-muted">
-          No rooms are set up yet. The owner can add rooms in Owner Dashboard → Admin Settings.
+      {/* ---- scheduled bookings: right-hand column on tablets / desktops ---- */}
+      <aside
+        aria-label="Scheduled bookings"
+        className="hidden w-[clamp(190px,12vw,260px)] shrink-0 sm:block"
+      >
+        <div className="sticky top-20 flex max-h-[calc(100dvh-7rem)] flex-col">
+          <h3 className="mb-2 flex items-center gap-2 font-display text-base font-semibold">
+            <Calendar size={16} className="text-brand" /> Scheduled
+            <span className="text-sm font-normal text-muted">({reservations.length})</span>
+          </h3>
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">{reservationList()}</div>
         </div>
-      ) : (
-        <div
-          className="grid gap-3 sm:gap-4"
-          style={{ gridTemplateColumns: roomGridColumns(rooms.length) }}
-        >
-          {rooms.map((room) => (
-            <RoomCard
-              key={room.id}
-              room={room}
-              now={now}
-              selectMode={selectMode}
-              selected={selected.includes(room.id)}
-              onToggleSelect={toggleSelect}
-              onOpen={openRoom}
-            />
-          ))}
-        </div>
+      </aside>
+
+      {/* ---- phone pop-up with the same list (scrollable) ---- */}
+      {showScheduled && (
+        <Modal onClose={() => setShowScheduled(false)} label="Scheduled bookings (phone)">
+          <div className="flex items-center justify-between border-b border-line px-5 py-4">
+            <h3 className="flex items-center gap-2 font-display text-lg font-semibold">
+              <Calendar size={18} className="text-brand" /> Scheduled bookings
+            </h3>
+            <button
+              onClick={() => setShowScheduled(false)}
+              aria-label="Close"
+              className="rounded-lg p-2.5 hover:bg-ink/10"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="overflow-y-auto p-4">
+            {reservationList(() => setShowScheduled(false))}
+          </div>
+        </Modal>
       )}
 
-      <ReservationsList
-        reservations={reservations}
-        now={now}
-        onCheckIn={activateReservation}
-        onCancel={cancelReservation}
-      />
+      {choice && (
+        <BookingChoiceModal
+          roomIds={choice}
+          onClose={() => setChoice(null)}
+          onCheckIn={() => {
+            setBooking({ mode: 'checkin', roomIds: choice });
+            setChoice(null);
+          }}
+          onSchedule={() => {
+            setBooking({ mode: 'schedule', roomIds: choice });
+            setChoice(null);
+          }}
+        />
+      )}
 
       {infoRoom && (
         <GuestInfoModal

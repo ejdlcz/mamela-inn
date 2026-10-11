@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { roomGridColumns } from './layout';
+import { phoneGridColumns, roomGridColumns } from './layout';
 
 describe('roomGridColumns', () => {
   it('makes buttons bigger for few rooms and smaller for many', () => {
@@ -7,5 +7,15 @@ describe('roomGridColumns', () => {
     expect(minOf(4)).toBeGreaterThan(minOf(10));
     expect(minOf(10)).toBeGreaterThan(minOf(20));
     expect(minOf(20)).toBeGreaterThan(minOf(40));
+  });
+});
+
+describe('phoneGridColumns', () => {
+  const cols = (n: number) => Number(/repeat\((\d+),/.exec(phoneGridColumns(n))![1]);
+  it('adds columns as rooms are added so everything fits one screen', () => {
+    expect(cols(4)).toBe(2);
+    expect(cols(10)).toBe(3);
+    expect(cols(16)).toBe(4);
+    expect(cols(30)).toBe(5);
   });
 });

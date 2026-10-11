@@ -45,20 +45,27 @@ export default function LandingPage({
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-base px-5 py-10 text-ink">
+    // Fixed to the screen: this page never scrolls. (Only while the owner sign-in
+    // form is open do we allow scrolling, as a safety net on very small screens.)
+    <div
+      className={
+        'relative flex h-dvh flex-col bg-base px-5 text-ink ' +
+        (ownerOpen ? 'overflow-y-auto py-6' : 'overflow-hidden')
+      }
+    >
       <button
         onClick={onToggleTheme}
         aria-label="Toggle day / night mode"
-        className="absolute right-5 top-5 rounded-full border border-line p-2.5"
+        className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-line sm:right-5 sm:top-5"
       >
-        {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+        {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
       </button>
 
-      <div className="w-full max-w-md animate-rise text-center">
+      <div className="m-auto w-full max-w-md animate-rise text-center">
         <img
           src={logo}
           alt={`${innName} logo`}
-          className="mx-auto w-64 select-none sm:w-72"
+          className={'mx-auto select-none sm:w-72 ' + (ownerOpen ? 'w-40' : 'w-64')}
           draggable={false}
         />
         <h1 className="-mt-2 font-display text-4xl font-bold text-brand sm:text-5xl">{innName}</h1>
@@ -66,14 +73,17 @@ export default function LandingPage({
           <p className="mt-1 text-sm font-semibold tracking-wide text-muted">{tagline}</p>
         )}
 
-        <div className="mt-10 grid gap-4">
-          <button onClick={onFrontDesk} className={choiceButton}>
-            <div className={iconBox}>
-              <KeyRound size={24} />
-            </div>
-            <div className="flex-1 font-display text-lg font-semibold">Front Desk</div>
-            <ChevronRight size={20} className="text-muted" />
-          </button>
+        <div className="mt-8 grid gap-4 sm:mt-10">
+          {/* Hidden on phones while the owner form is open so the form fits the screen */}
+          <div className={ownerOpen ? 'hidden sm:block' : ''}>
+            <button onClick={onFrontDesk} className={choiceButton}>
+              <div className={iconBox}>
+                <KeyRound size={24} />
+              </div>
+              <div className="flex-1 font-display text-lg font-semibold">Front Desk</div>
+              <ChevronRight size={20} className="text-muted" />
+            </button>
+          </div>
 
           {!ownerOpen ? (
             <button onClick={() => setOwnerOpen(true)} className={choiceButton}>

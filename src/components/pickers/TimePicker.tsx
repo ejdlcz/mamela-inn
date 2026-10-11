@@ -40,8 +40,8 @@ export default function TimePicker({ value, onChange }: TimePickerProps) {
   const setPeriod = (pm: boolean) => emit((h12 % 12) + (pm ? 12 : 0), minute);
 
   const itemClass = (active: boolean) =>
-    'w-full snap-center py-2.5 text-center text-sm font-bold tabular-nums ' +
-    (active ? 'bg-brand text-white' : 'hover:bg-ink/10');
+    'w-full snap-center py-3.5 text-center text-base font-bold tabular-nums sm:py-2.5 sm:text-sm ' +
+    (active ? 'bg-brand text-white' : 'text-ink hover:bg-ink/10');
 
   return (
     <div>
@@ -62,9 +62,9 @@ export default function TimePicker({ value, onChange }: TimePickerProps) {
           <div className="flex gap-2">
             <div
               ref={hourRef}
-              className="relative h-36 flex-1 snap-y snap-mandatory overflow-y-auto rounded-lg border border-line"
+              className="relative h-48 flex-1 snap-y snap-mandatory overflow-y-auto rounded-lg border border-line sm:h-36"
             >
-              <div className="h-14" />
+              <div className="h-20" />
               {HOURS.map((h) => (
                 <button
                   key={h}
@@ -75,14 +75,14 @@ export default function TimePicker({ value, onChange }: TimePickerProps) {
                   {pad2(h)}
                 </button>
               ))}
-              <div className="h-14" />
+              <div className="h-20" />
             </div>
 
             <div
               ref={minuteRef}
-              className="relative h-36 flex-1 snap-y snap-mandatory overflow-y-auto rounded-lg border border-line"
+              className="relative h-48 flex-1 snap-y snap-mandatory overflow-y-auto rounded-lg border border-line sm:h-36"
             >
-              <div className="h-14" />
+              <div className="h-20" />
               {MINUTES.map((m) => (
                 <button
                   key={m}
@@ -93,7 +93,7 @@ export default function TimePicker({ value, onChange }: TimePickerProps) {
                   {pad2(m)}
                 </button>
               ))}
-              <div className="h-14" />
+              <div className="h-20" />
             </div>
 
             <div className="flex flex-col justify-center gap-1.5">
@@ -105,8 +105,10 @@ export default function TimePicker({ value, onChange }: TimePickerProps) {
                     type="button"
                     onClick={() => setPeriod(p === 'PM')}
                     className={
-                      'rounded-lg px-2.5 py-2.5 text-xs font-bold ' +
-                      (active ? 'bg-brand text-white' : 'border border-line')
+                      'rounded-lg px-3.5 py-3.5 text-sm font-bold sm:px-2.5 sm:py-2.5 sm:text-xs ' +
+                      (active
+                        ? 'bg-brand text-white'
+                        : 'border border-line text-ink hover:bg-ink/10')
                     }
                   >
                     {p}
@@ -119,7 +121,7 @@ export default function TimePicker({ value, onChange }: TimePickerProps) {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="mt-2 w-full rounded-lg border border-line py-2 text-xs font-bold"
+            className="mt-2 w-full rounded-lg border border-line py-3 text-sm font-bold text-ink hover:bg-ink/10 sm:py-2 sm:text-xs"
           >
             Done
           </button>

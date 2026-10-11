@@ -14,8 +14,11 @@ async function enterFrontDesk() {
   return user;
 }
 
-async function checkIn(user: ReturnType<typeof userEvent.setup>, room: string, guest: string) {
+type User = ReturnType<typeof userEvent.setup>;
+
+async function checkIn(user: User, room: string, guest: string) {
   await user.click(await screen.findByRole('button', { name: `Room ${room}, Vacant` }));
+  await user.click(screen.getByRole('button', { name: /check in now/i }));
   await user.type(screen.getByLabelText('Guest Name'), guest);
   await user.click(screen.getByRole('button', { name: 'Confirm Check-In' }));
 }
@@ -74,31 +77,84 @@ describe('front desk', () => {
     expect(txns.every((t) => /^INN-\d{8}-\d{4}$/.test(t.ref))).toBe(true);
   });
 
+  it('shows the two booking options when a vacant room is tapped', async () => {
+    const user = await enterFrontDesk();
+    await user.click(await screen.findByRole('button', { name: 'Room 103, Vacant' }));
+    expect(screen.getByRole('button', { name: /check in now/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /schedule a booking/i })).toBeTruthy();
+  });
+
+  it('has no standalone "Schedule a Booking" button in the toolbar', async () => {
+    await enterFrontDesk();
+    await screen.findByRole('button', { name: 'Room 101, Vacant' });
+    expect(screen.queryByRole('button', { name: /schedule a booking/i })).toBeNull();
+  });
+
+  it('check in now has no date/time pickers: it always uses the current time', async () => {
+    const user = await enterFrontDesk();
+    await user.click(await screen.findByRole('button', { name: 'Room 101, Vacant' }));
+    await user.click(screen.getByRole('button', { name: /check in now/i }));
+    expect(screen.getByText(/^now ·/i)).toBeTruthy();
+    expect(screen.queryByText('Scheduled Date')).toBeNull();
+
+    const before = Date.now();
+    await user.type(screen.getByLabelText('Guest Name'), 'Walk-in');
+    await user.click(screen.getByRole('button', { name: 'Confirm Check-In' }));
+    await screen.findByRole('button', { name: 'Room 101, Occupied' });
+    const [txn] = JSON.parse(localStorage.getItem(STORAGE_KEYS.txns) ?? '[]');
+    expect(Math.abs(new Date(txn.timeIn).getTime() - before)).toBeLessThan(10_000);
+  });
+
+  it('schedule a booking still lets you pick a date and time', async () => {
+    const user = await enterFrontDesk();
+    await user.click(await screen.findByRole('button', { name: 'Room 103, Vacant' }));
+    await user.click(screen.getByRole('button', { name: /schedule a booking/i }));
+    expect(screen.getByText('Scheduled Date')).toBeTruthy();
+    expect(screen.getByText('Scheduled Time')).toBeTruthy();
+  });
+
+  it('books several selected rooms together', async () => {
+    const user = await enterFrontDesk();
+    await user.click(await screen.findByRole('button', { name: /multi-room select mode/i }));
+    await user.click(screen.getByRole('button', { name: 'Room 101, Vacant' }));
+    await user.click(screen.getByRole('button', { name: 'Room 102, Vacant' }));
+    await user.click(screen.getByRole('button', { name: /book selected \(2\)/i }));
+    await user.click(screen.getByRole('button', { name: /check in now/i }));
+    await user.type(screen.getByLabelText('Guest Name'), 'Group');
+    await user.click(screen.getByRole('button', { name: 'Confirm Check-In' }));
+
+    expect(await screen.findByRole('button', { name: 'Room 101, Occupied' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Room 102, Occupied' })).toBeTruthy();
+    expect(storedTxns()).toHaveLength(1);
+  });
+
   it('blocks a reservation that overlaps an existing stay in the same room', async () => {
     const user = await enterFrontDesk();
     await checkIn(user, '101', 'Juan');
     await screen.findByRole('button', { name: 'Room 101, Occupied' });
 
+    await user.click(screen.getByRole('button', { name: 'Room 102, Vacant' }));
     await user.click(screen.getByRole('button', { name: /schedule a booking/i }));
     await user.type(screen.getByLabelText('Guest Name'), 'Maria');
-    await user.click(screen.getByRole('button', { name: '101' }));
+    await user.click(screen.getByRole('button', { name: '101' })); // add the busy room
     await user.click(screen.getByRole('button', { name: /save reservation/i }));
 
     expect((await screen.findByRole('alert')).textContent).toMatch(/already booked for Juan/);
     expect(storedTxns()).toHaveLength(1);
   });
 
-  it('saves a reservation without occupying the room, then checks it in', async () => {
+  it('saves a reservation without occupying the room, lists it at the side, then checks it in', async () => {
     const user = await enterFrontDesk();
+    await user.click(await screen.findByRole('button', { name: 'Room 105, Vacant' }));
     await user.click(screen.getByRole('button', { name: /schedule a booking/i }));
     await user.type(screen.getByLabelText('Guest Name'), 'Maria');
-    await user.click(screen.getByRole('button', { name: '105' }));
     await user.click(screen.getByRole('button', { name: /save reservation/i }));
 
-    expect(await screen.findByText(/upcoming reservations/i)).toBeTruthy();
+    const side = await screen.findByRole('complementary', { name: /scheduled bookings/i });
+    expect(await within(side).findByText('Maria')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Room 105, Vacant' })).toBeTruthy();
 
-    await user.click(screen.getByRole('button', { name: /check in now/i }));
+    await user.click(within(side).getByRole('button', { name: /check in now/i }));
     expect(await screen.findByRole('button', { name: 'Room 105, Occupied' })).toBeTruthy();
     expect(storedTxns()[0].status).toBe('active');
   });

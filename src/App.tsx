@@ -38,8 +38,17 @@ function Shell() {
   // Front-desk staff can never reach the owner dashboard, even via stale state.
   const activeView: View = role === 'owner' ? view : 'frontdesk';
 
+  // On a portrait phone the Front Desk screen is fixed to the screen height (no page
+  // scrolling); the owner dashboard still scrolls normally.
+  const fixedOnPhone = activeView === 'frontdesk';
+
   return (
-    <div className="min-h-screen bg-base text-ink">
+    <div
+      className={
+        'flex min-h-screen flex-col bg-base text-ink ' +
+        (fixedOnPhone ? 'phone:h-dvh phone:min-h-0 phone:overflow-hidden' : '')
+      }
+    >
       <Header
         view={activeView}
         onViewChange={setView}
@@ -50,7 +59,7 @@ function Shell() {
         onToggleTheme={toggleTheme}
       />
 
-      <main className="mx-auto max-w-7xl px-5 py-6">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-5 py-6 phone:min-h-0 phone:px-3 phone:py-3">
         {data.error && (
           <div
             role="alert"
@@ -72,7 +81,12 @@ function Shell() {
         )}
       </main>
 
-      <footer className="mx-auto max-w-7xl px-5 pb-6 text-xs text-muted">
+      <footer
+        className={
+          'mx-auto w-full max-w-7xl px-5 pb-6 text-xs text-muted ' +
+          (fixedOnPhone ? 'phone:hidden' : '')
+        }
+      >
         {data.mode === 'supabase'
           ? 'Connected to Supabase — changes sync live across all devices.'
           : "Local mode — data is saved in this browser only and isn't shared between devices. Add your Supabase keys to .env to sync (see README)."}

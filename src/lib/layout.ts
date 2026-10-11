@@ -12,3 +12,12 @@ export function roomGridColumns(roomCount: number) {
   else if (roomCount <= 6) [min, max] = [170, 260];
   return `repeat(auto-fill, minmax(clamp(${min}px, 11vw, ${max}px), 1fr))`;
 }
+
+/**
+ * Narrow screens (phones): a fixed number of equal columns, so the whole grid
+ * fits on one screen without scrolling. More rooms -> more, smaller columns.
+ */
+export function phoneGridColumns(roomCount: number) {
+  const cols = roomCount <= 6 ? 2 : roomCount <= 12 ? 3 : roomCount <= 20 ? 4 : 5;
+  return `repeat(${cols}, minmax(0, 1fr))`;
+}
