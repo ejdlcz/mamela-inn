@@ -302,7 +302,7 @@ export default function FrontDesk({ data }: { data: InnData }) {
         className="hidden w-[clamp(190px,12vw,260px)] shrink-0 sm:block"
       >
         <div className="sticky top-20 flex max-h-[calc(100dvh-7rem)] flex-col">
-          <h3 className="mb-2 flex items-center gap-2 font-display text-base font-semibold">
+          <h3 className="mb-2 flex items-center gap-2 font-display text-base font-semibold text-ink">
             <Calendar size={16} className="text-brand" /> Scheduled
             <span className="text-sm font-normal text-muted">({reservations.length})</span>
           </h3>

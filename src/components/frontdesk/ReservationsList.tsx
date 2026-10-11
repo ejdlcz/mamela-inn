@@ -26,7 +26,7 @@ export default function ReservationsList({
         const late = new Date(t.timeIn) < now;
         return (
           <div key={t.ref} className="card p-3">
-            <div className="truncate text-sm font-semibold">{t.guestName}</div>
+            <div className="truncate text-sm font-semibold text-ink">{t.guestName}</div>
             <div className="text-xs text-muted">Room {t.roomIds.join(', ')}</div>
             <div className="mt-0.5 text-xs tabular-nums text-muted">
               {fmtDateTime(t.timeIn)} · {t.hours}h
@@ -46,7 +46,7 @@ export default function ReservationsList({
               <button
                 onClick={() => onCancel(t)}
                 aria-label={`Cancel reservation for ${t.guestName}`}
-                className="btn-outline px-3 py-2 text-xs text-overdue-bright sm:px-2 sm:py-1.5"
+                className="btn-outline px-3 py-2 text-xs text-overdue-bright hover:bg-ink/10 sm:px-2 sm:py-1.5"
               >
                 <X size={14} />
               </button>
