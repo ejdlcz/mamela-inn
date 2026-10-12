@@ -7,6 +7,7 @@
   --c-base: 255 255 255; /* page background */
   --c-surface: 255 255 255; /* cards, modals, header */
   --c-line: 232 225 214; /* borders */
+  --c-panel: 241 240 238; /* light grey box behind the Scheduled list */
   --c-ink: 35 26 18; /* main text */
   --c-muted: 107 97 86; /* secondary text */
 
@@ -27,6 +28,7 @@
   --c-base: 24 19 16;
   --c-surface: 33 26 21;
   --c-line: 76 60 41;
+  --c-panel: 12 9 7; /* darker than the page so the Scheduled box stands out at night */
   --c-ink: 243 236 227;
   --c-muted: 185 170 152;
 

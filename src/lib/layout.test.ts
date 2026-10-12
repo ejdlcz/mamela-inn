@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { phoneGridColumns, roomGridColumns } from './layout';
+import { densityForCellHeight, phoneGridColumns, roomGridColumns } from './layout';
 
 describe('roomGridColumns', () => {
   it('makes buttons bigger for few rooms and smaller for many', () => {
@@ -17,5 +17,13 @@ describe('phoneGridColumns', () => {
     expect(cols(10)).toBe(3);
     expect(cols(16)).toBe(4);
     expect(cols(30)).toBe(5);
+  });
+});
+
+describe('densityForCellHeight', () => {
+  it('shows less detail as the room buttons get shorter, but always keeps the time', () => {
+    expect(densityForCellHeight(150)).toBe('comfortable');
+    expect(densityForCellHeight(120)).toBe('compact');
+    expect(densityForCellHeight(80)).toBe('tiny');
   });
 });

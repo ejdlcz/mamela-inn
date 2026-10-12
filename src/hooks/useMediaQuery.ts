@@ -24,3 +24,4 @@ export function useMediaQuery(query: string) {
 }
 
 export const useIsNarrow = () => useMediaQuery(NARROW_QUERY);
+export const useIsPhone = () => useMediaQuery(PHONE_QUERY);

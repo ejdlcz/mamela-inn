@@ -15,6 +15,7 @@ export default {
       colors: {
         base: color('base'),
         surface: color('surface'),
+        panel: color('panel'),
         line: color('line'),
         ink: color('ink'),
         muted: color('muted'),

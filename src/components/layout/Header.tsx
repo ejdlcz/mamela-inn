@@ -43,7 +43,7 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-surface pt-[env(safe-area-inset-top)]">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 sm:px-5 sm:py-2.5">
+      <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 sm:px-5 sm:py-2.5">
         <div className="order-1 flex min-w-0 items-center gap-2">
           <img
             src={logo}
@@ -68,7 +68,7 @@ export default function Header({
         )}
 
         <div className="order-2 flex items-center gap-2 sm:order-3 sm:gap-3">
-          <div className="hidden items-center gap-2 text-sm tabular-nums text-muted sm:flex">
+          <div className="hidden items-center gap-2 text-sm tabular-nums text-muted lg:flex">
             <Clock size={15} />
             {fmtClock(now)}
           </div>
@@ -88,10 +88,10 @@ export default function Header({
             onClick={onLogout}
             title="Log out"
             aria-label="Log out"
-            className={roundButton + ' sm:w-auto sm:gap-1.5 sm:px-3 sm:text-sm sm:font-semibold'}
+            className={roundButton + ' lg:w-auto lg:gap-1.5 lg:px-3 lg:text-sm lg:font-semibold'}
           >
             <LogOut className="h-5 w-5 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Log out</span>
+            <span className="hidden lg:inline">Log out</span>
           </button>
         </div>
       </div>

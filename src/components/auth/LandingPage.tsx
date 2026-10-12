@@ -102,7 +102,7 @@ export default function LandingPage({
                 <div className="rounded-lg bg-brand/10 p-2 text-brand">
                   <Lock size={16} />
                 </div>
-                <div className="font-display text-base font-semibold">Owner sign-in</div>
+                <div className="font-display text-base font-semibold text-ink">Owner sign-in</div>
               </div>
 
               {usingDefaultOwnerLogin && (

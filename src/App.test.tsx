@@ -177,3 +177,61 @@ describe('owner', () => {
     expect(screen.getByText(/1 of 1 transactions shown/i)).toBeTruthy();
   });
 });
+
+describe('sign-in is never remembered', () => {
+  it('starts on the landing page even if an old sign-in was stored', async () => {
+    localStorage.setItem(STORAGE_KEYS.role, 'owner');
+    render(<App />);
+    expect(screen.getByRole('button', { name: /front desk/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /owner dashboard/i })).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEYS.role)).toBeNull();
+  });
+
+  it('returns to the landing page when the app is opened again', async () => {
+    const user = userEvent.setup();
+    const first = render(<App />);
+    await user.click(screen.getByRole('button', { name: /front desk/i }));
+    expect(await screen.findByRole('button', { name: 'Room 101, Vacant' })).toBeTruthy();
+    first.unmount();
+
+    render(<App />);
+    expect(screen.queryByRole('button', { name: 'Room 101, Vacant' })).toBeNull();
+    expect(screen.getByRole('button', { name: /owner/i })).toBeTruthy();
+  });
+});
+
+describe('booking calendar', () => {
+  it('shows scheduled bookings and lets you check one in from the day list', async () => {
+    const user = await enterFrontDesk();
+    await user.click(await screen.findByRole('button', { name: 'Room 105, Vacant' }));
+    await user.click(screen.getByRole('button', { name: /schedule a booking/i }));
+    await user.type(screen.getByLabelText('Guest Name'), 'Maria');
+    await user.click(screen.getByRole('button', { name: /save reservation/i }));
+    await screen.findByRole('complementary', { name: /scheduled bookings/i });
+
+    await user.click(screen.getByRole('button', { name: /open booking calendar/i }));
+    const calendar = await screen.findByRole('dialog', { name: /booking calendar/i });
+    // the booking appears on its day in the grid and in the day list
+    expect(within(calendar).getAllByText(/Maria/).length).toBeGreaterThanOrEqual(2);
+
+    await user.click(within(calendar).getByRole('button', { name: /check in now/i }));
+    expect(await screen.findByRole('button', { name: 'Room 105, Occupied' })).toBeTruthy();
+    expect(within(calendar).queryByText(/Maria/)).toBeNull();
+
+    await user.click(within(calendar).getByRole('button', { name: /close calendar/i }));
+    expect(screen.queryByRole('dialog', { name: /booking calendar/i })).toBeNull();
+  });
+
+  it('can be opened with no bookings and navigate months', async () => {
+    const user = await enterFrontDesk();
+    await screen.findByRole('button', { name: 'Room 101, Vacant' });
+    await user.click(screen.getByRole('button', { name: /open booking calendar/i }));
+    const calendar = await screen.findByRole('dialog', { name: /booking calendar/i });
+    const title = () => calendar.querySelector('.font-display.text-lg:not(h3)')!.textContent;
+    const before = title();
+    await user.click(within(calendar).getByRole('button', { name: /next month/i }));
+    expect(title()).not.toBe(before);
+    await user.click(within(calendar).getByRole('button', { name: /^today$/i }));
+    expect(title()).toBe(before);
+  });
+});

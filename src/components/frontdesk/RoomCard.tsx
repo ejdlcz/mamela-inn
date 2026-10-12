@@ -1,5 +1,6 @@
 import { Bed, Check, Clock, Users } from 'lucide-react';
 import { fmtMoney, pad2, remaining } from '../../lib/format';
+import type { Density } from '../../lib/layout';
 import type { Room } from '../../types';
 
 // Full class names (not built dynamically) so Tailwind can see them.
@@ -12,8 +13,10 @@ const LOOKS = {
 interface RoomCardProps {
   room: Room;
   now: Date;
-  /** Narrow screens: shorter texts so everything fits in a small button. */
-  compact: boolean;
+  /** Narrow screen: shorter texts. */
+  narrow: boolean;
+  /** How much the button can show for the height it has (phones only; see useGridDensity). */
+  density: Density;
   selectMode: boolean;
   selected: boolean;
   onToggleSelect: (id: string) => void;
@@ -23,13 +26,16 @@ interface RoomCardProps {
 export default function RoomCard({
   room,
   now,
-  compact,
+  narrow,
+  density,
   selectMode,
   selected,
   onToggleSelect,
   onOpen,
 }: RoomCardProps) {
   const occupied = room.status === 'occupied';
+  const tiny = density === 'tiny';
+  const dense = density !== 'comfortable';
   let look: (typeof LOOKS)[keyof typeof LOOKS] = LOOKS.vacant;
   let timeLabel = '';
 
@@ -37,7 +43,7 @@ export default function RoomCard({
     const { overdue, h, m } = remaining(new Date(room.timeOut ?? now).getTime() - now.getTime());
     look = overdue ? LOOKS.overdue : LOOKS.occupied;
     const hm = `${h}h ${pad2(m)}m`;
-    timeLabel = overdue ? (compact ? `-${hm}` : `Overdue by ${hm}`) : compact ? hm : `${hm} left`;
+    timeLabel = overdue ? (narrow ? `-${hm}` : `Overdue by ${hm}`) : narrow ? hm : `${hm} left`;
   }
 
   const handleClick = () => {
@@ -50,9 +56,11 @@ export default function RoomCard({
       onClick={handleClick}
       aria-label={`Room ${room.number}, ${look.label}`}
       className={
-        // On a portrait phone the card stretches to fill its grid row (no page scrolling);
-        // on bigger screens it keeps a comfortable minimum height.
-        'key-tag relative flex min-h-[110px] flex-col overflow-hidden rounded-xl border-[3px] px-2.5 pb-2 pt-6 text-left text-white transition-all duration-150 ' +
+        // Phones: the button stretches to fill its grid row, and shows less when the row is short
+        // (so the time left never gets cut off). Bigger screens keep a comfortable minimum height.
+        (tiny ? '' : 'key-tag ') +
+        'relative flex min-h-[110px] flex-col overflow-hidden rounded-xl border-[3px] px-2.5 text-left text-white transition-all duration-150 ' +
+        (tiny ? 'pb-1.5 pt-2 ' : dense ? 'pb-1.5 pt-5 ' : 'pb-2 pt-6 ') +
         'phone:min-h-0 sm:min-h-[clamp(150px,15vw,200px)] sm:rounded-2xl sm:px-4 sm:pb-4 sm:pt-8 ' +
         'hover:-translate-y-0.5 active:translate-y-1 active:shadow-key-pressed ' +
         look.box +
@@ -70,22 +78,34 @@ export default function RoomCard({
         </span>
       )}
 
-      <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-black/20 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider sm:px-2.5 sm:py-1 sm:text-[11px]">
-        {occupied ? (
-          <Users size={13} className="hidden sm:block" />
-        ) : (
-          <Bed size={13} className="hidden sm:block" />
-        )}
-        {look.label}
-      </span>
+      {!tiny && (
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-black/20 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider sm:px-2.5 sm:py-1 sm:text-[11px]">
+          {occupied ? (
+            <Users size={13} className="hidden sm:block" />
+          ) : (
+            <Bed size={13} className="hidden sm:block" />
+          )}
+          {look.label}
+        </span>
+      )}
 
-      <div className="mt-1 font-display text-3xl font-bold leading-none tabular-nums sm:mt-2.5 sm:text-4xl lg:text-5xl">
+      <div
+        className={
+          'font-display font-bold leading-none tabular-nums sm:mt-2.5 sm:text-4xl lg:text-5xl ' +
+          (dense ? 'text-2xl ' : 'mt-1 text-3xl ')
+        }
+      >
         {room.number}
       </div>
 
       {occupied ? (
-        <div className="mt-auto min-w-0 space-y-0.5 pt-1 sm:mt-3 sm:space-y-1">
-          <div className="truncate text-xs font-semibold sm:text-sm">
+        // Phones: time left sits ABOVE the guest name, so if space runs out the name goes first.
+        <div className="mt-auto flex min-w-0 flex-col-reverse gap-0.5 pt-1 sm:mt-3 sm:flex-col sm:gap-1">
+          <div
+            className={
+              'truncate text-xs font-semibold sm:block sm:text-sm ' + (dense ? 'hidden' : '')
+            }
+          >
             {room.guestName || 'Guest'}
           </div>
           <div className="flex w-fit items-center gap-1 rounded-md bg-black/20 px-1.5 py-0.5 text-[11px] font-bold tabular-nums sm:text-xs">

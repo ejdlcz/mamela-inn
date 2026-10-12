@@ -8,6 +8,11 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
   'Bank Transfer',
 ];
 
+/** Sign out (back to the landing page) after this many minutes without any touch/click/key. */
+export const INACTIVITY_MINUTES = 30;
+/** Sign out if the app was in the background / screen off for this long. 0 = never. */
+export const BACKGROUND_MINUTES = 5;
+
 /** Quick-pick buttons in the check-in form */
 export const DURATION_PRESETS = [3, 6, 12, 22, 24];
 

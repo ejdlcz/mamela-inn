@@ -17,7 +17,19 @@ export function roomGridColumns(roomCount: number) {
  * Narrow screens (phones): a fixed number of equal columns, so the whole grid
  * fits on one screen without scrolling. More rooms -> more, smaller columns.
  */
+export function phoneGridColumnCount(roomCount: number) {
+  return roomCount <= 6 ? 2 : roomCount <= 12 ? 3 : roomCount <= 20 ? 4 : 5;
+}
+
 export function phoneGridColumns(roomCount: number) {
-  const cols = roomCount <= 6 ? 2 : roomCount <= 12 ? 3 : roomCount <= 20 ? 4 : 5;
-  return `repeat(${cols}, minmax(0, 1fr))`;
+  return `repeat(${phoneGridColumnCount(roomCount)}, minmax(0, 1fr))`;
+}
+
+/** How much detail a room button can show for the height it ends up with. */
+export type Density = 'comfortable' | 'compact' | 'tiny';
+
+export function densityForCellHeight(heightPx: number): Density {
+  if (heightPx >= 136) return 'comfortable'; // status, number, time left, guest name
+  if (heightPx >= 106) return 'compact'; // status, number, time left
+  return 'tiny'; // number, time left (always visible)
 }

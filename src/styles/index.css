@@ -20,6 +20,17 @@
       border-color 0.7s ease,
       color 0.7s ease;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  /* Rapid taps (e.g. picking several rooms) must not trigger the browser's double-tap zoom */
+  button,
+  select,
+  input,
+  label {
+    touch-action: manipulation;
+  }
   /* Buttons and their text should never be highlightable */
   button {
     user-select: none;

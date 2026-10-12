@@ -3,10 +3,12 @@ import LandingPage from './components/auth/LandingPage';
 import FrontDesk from './components/frontdesk/FrontDesk';
 import Header from './components/layout/Header';
 import OwnerDashboard from './components/owner/OwnerDashboard';
+import { BACKGROUND_MINUTES, INACTIVITY_MINUTES } from './config/defaults';
 import { useAuth } from './hooks/useAuth';
+import { useInactivityLogout } from './hooks/useInactivityLogout';
 import { useInnData } from './hooks/useInnData';
 import { useTheme } from './hooks/useTheme';
-import { ToastProvider } from './hooks/useToast';
+import { ToastProvider, useToast } from './hooks/useToast';
 import type { View } from './types';
 
 function Shell() {
@@ -14,6 +16,23 @@ function Shell() {
   const { role, loginFrontDesk, loginOwner, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [view, setView] = useState<View>('frontdesk');
+  const toast = useToast();
+
+  // Back to the landing page after a period of inactivity, or when the app was left in the background.
+  useInactivityLogout({
+    active: role !== null,
+    inactivityMinutes: INACTIVITY_MINUTES,
+    backgroundMinutes: BACKGROUND_MINUTES,
+    onTimeout: (reason) => {
+      logout();
+      toast(
+        reason === 'inactive'
+          ? `Signed out after ${INACTIVITY_MINUTES} minutes of inactivity.`
+          : 'Signed out because the app was closed or in the background.',
+        'info',
+      );
+    },
+  });
 
   if (!role) {
     return (
@@ -59,7 +78,7 @@ function Shell() {
         onToggleTheme={toggleTheme}
       />
 
-      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-5 py-6 phone:min-h-0 phone:px-3 phone:py-3">
+      <main className="mx-auto flex w-full max-w-screen-2xl flex-1 flex-col px-5 py-6 phone:min-h-0 phone:px-3 phone:py-3">
         {data.error && (
           <div
             role="alert"
@@ -83,7 +102,7 @@ function Shell() {
 
       <footer
         className={
-          'mx-auto w-full max-w-7xl px-5 pb-6 text-xs text-muted ' +
+          'mx-auto w-full max-w-screen-2xl px-5 pb-6 text-xs text-muted ' +
           (fixedOnPhone ? 'phone:hidden' : '')
         }
       >

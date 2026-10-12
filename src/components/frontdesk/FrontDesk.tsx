@@ -1,6 +1,7 @@
-import { Calendar, LayoutGrid, LogIn, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { useIsNarrow } from '../../hooks/useMediaQuery';
+import { Calendar, ClipboardList, LayoutGrid, LogIn, X } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { useGridDensity } from '../../hooks/useGridDensity';
+import { useIsNarrow, useIsPhone } from '../../hooks/useMediaQuery';
 import { useNow } from '../../hooks/useNow';
 import { useToast } from '../../hooks/useToast';
 import type { InnData } from '../../hooks/useInnData';
@@ -9,6 +10,7 @@ import { fmtDateTime } from '../../lib/format';
 import { phoneGridColumns, roomGridColumns } from '../../lib/layout';
 import type { Room, Transaction } from '../../types';
 import Modal from '../ui/Modal';
+import BookingCalendar from './BookingCalendar';
 import BookingChoiceModal from './BookingChoiceModal';
 import CheckInModal from './CheckInModal';
 import GuestInfoModal from './GuestInfoModal';
@@ -21,6 +23,8 @@ export default function FrontDesk({ data }: { data: InnData }) {
   const toast = useToast();
   const now = useNow(1000);
   const narrow = useIsNarrow();
+  const isPhone = useIsPhone();
+  const gridRef = useRef<HTMLDivElement>(null);
   const { rooms, txns, settings } = data;
 
   const [selectMode, setSelectMode] = useState(false);
@@ -32,6 +36,7 @@ export default function FrontDesk({ data }: { data: InnData }) {
   /** rooms waiting for the "Check in now / Schedule a booking" choice */
   const [choice, setChoice] = useState<string[] | null>(null);
   const [showScheduled, setShowScheduled] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [infoRoomId, setInfoRoomId] = useState<string | null>(null);
 
   const activeTxnByRoom = useMemo(() => {
@@ -208,6 +213,7 @@ export default function FrontDesk({ data }: { data: InnData }) {
 
   /* ---- render ------------------------------------------------------------- */
   const vacantCount = rooms.filter((r) => r.status === 'vacant').length;
+  const density = useGridDensity(gridRef, rooms.length, isPhone);
 
   const reservationList = (afterCheckIn?: () => void) => (
     <ReservationsList
@@ -260,7 +266,7 @@ export default function FrontDesk({ data }: { data: InnData }) {
               onClick={() => setShowScheduled(true)}
               className="btn-outline h-11 flex-1 sm:hidden"
             >
-              <Calendar size={16} /> Scheduled ({reservations.length})
+              <ClipboardList size={16} /> Scheduled ({reservations.length})
             </button>
           </div>
         </div>
@@ -271,6 +277,7 @@ export default function FrontDesk({ data }: { data: InnData }) {
           </div>
         ) : (
           <div
+            ref={gridRef}
             // On a portrait phone the grid fills the leftover screen height (rows share it
             // equally), so the page itself never scrolls.
             className="grid min-h-0 gap-2 phone:flex-1 phone:auto-rows-fr sm:gap-4"
@@ -285,7 +292,8 @@ export default function FrontDesk({ data }: { data: InnData }) {
                 key={room.id}
                 room={room}
                 now={now}
-                compact={narrow}
+                narrow={narrow}
+                density={density}
                 selectMode={selectMode}
                 selected={selected.includes(room.id)}
                 onToggleSelect={toggleSelect}
@@ -301,9 +309,17 @@ export default function FrontDesk({ data }: { data: InnData }) {
         aria-label="Scheduled bookings"
         className="hidden w-[clamp(190px,12vw,260px)] shrink-0 sm:block"
       >
-        <div className="sticky top-20 flex max-h-[calc(100dvh-7rem)] flex-col">
+        <div className="sticky top-20 flex max-h-[calc(100dvh-7rem)] flex-col rounded-xl border border-line bg-panel p-3">
           <h3 className="mb-2 flex items-center gap-2 font-display text-base font-semibold text-ink">
-            <Calendar size={16} className="text-brand" /> Scheduled
+            <button
+              onClick={() => setShowCalendar(true)}
+              aria-label="Open booking calendar"
+              title="Open booking calendar"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-brand hover:border-brand-bright"
+            >
+              <Calendar size={18} />
+            </button>
+            Scheduled
             <span className="text-sm font-normal text-muted">({reservations.length})</span>
           </h3>
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">{reservationList()}</div>
@@ -314,21 +330,41 @@ export default function FrontDesk({ data }: { data: InnData }) {
       {showScheduled && (
         <Modal onClose={() => setShowScheduled(false)} label="Scheduled bookings (phone)">
           <div className="flex items-center justify-between border-b border-line px-5 py-4">
-            <h3 className="flex items-center gap-2 font-display text-lg font-semibold">
-              <Calendar size={18} className="text-brand" /> Scheduled bookings
-            </h3>
-            <button
-              onClick={() => setShowScheduled(false)}
-              aria-label="Close"
-              className="rounded-lg p-2.5 hover:bg-ink/10"
-            >
-              <X size={20} />
-            </button>
+            <h3 className="font-display text-lg font-semibold">Scheduled bookings</h3>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  setShowScheduled(false);
+                  setShowCalendar(true);
+                }}
+                aria-label="Open booking calendar"
+                className="btn-outline px-3 py-2"
+              >
+                <Calendar size={16} /> Calendar
+              </button>
+              <button
+                onClick={() => setShowScheduled(false)}
+                aria-label="Close"
+                className="rounded-lg p-2.5 hover:bg-ink/10"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
           <div className="overflow-y-auto p-4">
             {reservationList(() => setShowScheduled(false))}
           </div>
         </Modal>
+      )}
+
+      {showCalendar && (
+        <BookingCalendar
+          reservations={reservations}
+          now={now}
+          onClose={() => setShowCalendar(false)}
+          onCheckIn={activateReservation}
+          onCancel={cancelReservation}
+        />
       )}
 
       {choice && (
