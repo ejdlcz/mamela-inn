@@ -17,6 +17,11 @@ export interface Room {
   guestName: string | null;
   /** ISO time the current stay ends */
   timeOut: string | null;
+  /**
+   * Set when a guest overstayed and was removed automatically. The room is free to book
+   * again but keeps showing "Overdue" until the clerk confirms the guest left.
+   */
+  overstayRef?: string | null;
 }
 
 export interface Transaction {
@@ -24,6 +29,8 @@ export interface Transaction {
   ref: string;
   guestName: string;
   roomIds: string[];
+  adults?: number;
+  children?: number;
   hours: number;
   /** ISO */
   timeIn: string;
@@ -36,6 +43,15 @@ export interface Transaction {
   status: TxnStatus;
   /** ISO */
   createdAt: string;
+  /** Why a reservation was cancelled / refunded */
+  cancelReason?: string | null;
+  cancelNote?: string | null;
+  refundAmount?: number | null;
+  cancelledAt?: string | null;
+  /** Minutes the guest stayed past their time-out (0 / empty = on time) */
+  overstayMinutes?: number | null;
+  /** true when the system checked the guest out after the grace period */
+  autoCheckedOut?: boolean;
 }
 
 export interface Settings {
@@ -45,4 +61,6 @@ export interface Settings {
   recipientEmails: string[];
   taxRate: number;
   defaultRate: number;
+  /** Minutes after the time-out before an overdue guest is removed automatically */
+  graceMinutes: number;
 }

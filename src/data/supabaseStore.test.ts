@@ -20,6 +20,7 @@ describe('supabase row mappers', () => {
       txnId: 'INN-1',
       guestName: 'Ana',
       timeOut: '2030-01-01T05:00:00.000Z',
+      overstayRef: null,
     };
     expect(rowToRoom(roomToRow(room))).toEqual(room);
   });
@@ -29,14 +30,22 @@ describe('supabase row mappers', () => {
       ref: 'INN-20300101-1234',
       guestName: 'Ana',
       roomIds: ['101', '102'],
+      adults: 2,
+      children: 1,
       hours: 6,
       timeIn: '2030-01-01T02:00:00.000Z',
       timeOut: '2030-01-01T08:00:00.000Z',
       actualTimeOut: null,
       paymentMethod: 'Maya',
       totalAmount: 2160,
-      status: 'scheduled',
+      status: 'cancelled',
       createdAt: '2029-12-30T00:00:00.000Z',
+      cancelReason: 'Customer changed plans',
+      cancelNote: null,
+      refundAmount: 1000,
+      cancelledAt: '2029-12-31T00:00:00.000Z',
+      overstayMinutes: null,
+      autoCheckedOut: false,
     };
     expect(rowToTxn(txnToRow(t))).toEqual(t);
   });
@@ -56,9 +65,11 @@ describe('supabase row mappers', () => {
       recipient_emails: null,
       tax_rate: '0',
       default_rate: '180',
+      grace_minutes: 20,
     });
     expect(s.recipientEmails).toEqual([]);
     expect(s.tagline).toBe('');
+    expect(s.graceMinutes).toBe(20);
   });
 });
 
@@ -70,4 +81,5 @@ const DEFAULT_ROOM: Room = {
   txnId: null,
   guestName: null,
   timeOut: null,
+  overstayRef: null,
 };

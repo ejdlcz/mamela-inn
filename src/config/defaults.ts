@@ -13,6 +13,16 @@ export const INACTIVITY_MINUTES = 30;
 /** Sign out if the app was in the background / screen off for this long. 0 = never. */
 export const BACKGROUND_MINUTES = 5;
 
+/** Reasons offered when a scheduled booking is cancelled / refunded. */
+export const CANCEL_REASONS = [
+  'Customer changed plans',
+  'Customer no-show',
+  'Booked by mistake / duplicate',
+  'Room not available',
+  'Payment problem',
+  'Other',
+];
+
 /** Quick-pick buttons in the check-in form */
 export const DURATION_PRESETS = [3, 6, 12, 22, 24];
 
@@ -35,6 +45,7 @@ export const DEFAULT_SETTINGS: Settings = {
   recipientEmails: [],
   taxRate: 0,
   defaultRate: DEFAULT_RATE,
+  graceMinutes: 15,
 };
 
 /** localStorage keys. Rooms/txns/settings are only used in local mode. */

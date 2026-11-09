@@ -1,7 +1,9 @@
 import { ArrowLeftRight, Clock, LogOut, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { useNow } from '../../hooks/useNow';
+import { guestsText } from '../../lib/export';
 import { fmtDateTime, fmtMoney, pad2, remaining } from '../../lib/format';
+import { graceDeadline } from '../../lib/overdue';
 import type { Room, Transaction } from '../../types';
 import Modal from '../ui/Modal';
 
@@ -9,6 +11,8 @@ interface GuestInfoModalProps {
   room: Room;
   txn: Transaction | null;
   rooms: Room[];
+  /** minutes an overdue guest may stay before being removed automatically */
+  graceMinutes: number;
   onClose: () => void;
   onCheckout: (txn: Transaction) => void;
   onChangeRoom: (txn: Transaction, fromId: string, toId: string) => void;
@@ -22,6 +26,7 @@ export default function GuestInfoModal({
   room,
   txn,
   rooms,
+  graceMinutes,
   onClose,
   onCheckout,
   onChangeRoom,
@@ -40,6 +45,10 @@ export default function GuestInfoModal({
 
   const vacant = rooms.filter((r) => r.status === 'vacant');
   const { overdue, h, m } = remaining(txn ? new Date(txn.timeOut).getTime() - now.getTime() : 0);
+
+  const graceLeftMin = txn
+    ? Math.max(0, Math.ceil((+graceDeadline(txn, graceMinutes) - +now) / 60_000))
+    : 0;
 
   const detail = (label: string, value: string) => (
     <div>
@@ -74,13 +83,16 @@ export default function GuestInfoModal({
               }
             >
               <Clock size={16} />
-              {overdue ? `Overdue by ${h}h ${pad2(m)}m` : `${h}h ${pad2(m)}m remaining`}
+              {overdue
+                ? `Overdue by ${h}h ${pad2(m)}m — guest is removed automatically in ${graceLeftMin} min`
+                : `${h}h ${pad2(m)}m remaining`}
             </div>
 
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
               {detail('Reference #', txn.ref)}
               {detail('Guest name', txn.guestName)}
               {detail('Rooms', txn.roomIds.join(', '))}
+              {detail('Guests', guestsText(txn))}
               {detail('Duration', `${txn.hours} hrs`)}
               {detail('Time in', fmtDateTime(txn.timeIn))}
               {detail('Time out', fmtDateTime(txn.timeOut))}

@@ -13,11 +13,14 @@ interface RoomRow {
   txn_id: string | null;
   guest_name: string | null;
   time_out: string | null;
+  overstay_ref: string | null;
 }
 interface TxnRow {
   ref: string;
   guest_name: string;
   room_ids: string[];
+  adults: number;
+  children: number;
   hours: number | string;
   time_in: string;
   time_out: string;
@@ -26,6 +29,12 @@ interface TxnRow {
   total_amount: number | string;
   status: TxnStatus;
   created_at: string;
+  cancel_reason: string | null;
+  cancel_note: string | null;
+  refund_amount: number | string | null;
+  cancelled_at: string | null;
+  overstay_minutes: number | null;
+  auto_checked_out: boolean;
 }
 interface SettingsRow {
   id: number;
@@ -35,6 +44,7 @@ interface SettingsRow {
   recipient_emails: string[] | null;
   tax_rate: number | string;
   default_rate: number | string;
+  grace_minutes: number;
 }
 
 /* ---- Mappers: Postgres row <-> app type ----------------------------------- */
@@ -46,6 +56,7 @@ export const rowToRoom = (r: RoomRow): Room => ({
   txnId: r.txn_id,
   guestName: r.guest_name,
   timeOut: r.time_out,
+  overstayRef: r.overstay_ref ?? null,
 });
 export const roomToRow = (r: Room): RoomRow => ({
   id: r.id,
@@ -55,12 +66,15 @@ export const roomToRow = (r: Room): RoomRow => ({
   txn_id: r.txnId,
   guest_name: r.guestName,
   time_out: r.timeOut,
+  overstay_ref: r.overstayRef ?? null,
 });
 
 export const rowToTxn = (r: TxnRow): Transaction => ({
   ref: r.ref,
   guestName: r.guest_name,
   roomIds: r.room_ids ?? [],
+  adults: r.adults ?? 1,
+  children: r.children ?? 0,
   hours: Number(r.hours),
   timeIn: r.time_in,
   timeOut: r.time_out,
@@ -69,11 +83,20 @@ export const rowToTxn = (r: TxnRow): Transaction => ({
   totalAmount: Number(r.total_amount),
   status: r.status,
   createdAt: r.created_at,
+  cancelReason: r.cancel_reason ?? null,
+  cancelNote: r.cancel_note ?? null,
+  refundAmount:
+    r.refund_amount === null || r.refund_amount === undefined ? null : Number(r.refund_amount),
+  cancelledAt: r.cancelled_at ?? null,
+  overstayMinutes: r.overstay_minutes ?? null,
+  autoCheckedOut: r.auto_checked_out ?? false,
 });
 export const txnToRow = (t: Transaction): TxnRow => ({
   ref: t.ref,
   guest_name: t.guestName,
   room_ids: t.roomIds,
+  adults: t.adults ?? 1,
+  children: t.children ?? 0,
   hours: t.hours,
   time_in: t.timeIn,
   time_out: t.timeOut,
@@ -82,6 +105,12 @@ export const txnToRow = (t: Transaction): TxnRow => ({
   total_amount: t.totalAmount,
   status: t.status,
   created_at: t.createdAt,
+  cancel_reason: t.cancelReason ?? null,
+  cancel_note: t.cancelNote ?? null,
+  refund_amount: t.refundAmount ?? null,
+  cancelled_at: t.cancelledAt ?? null,
+  overstay_minutes: t.overstayMinutes ?? null,
+  auto_checked_out: t.autoCheckedOut ?? false,
 });
 
 export const rowToSettings = (r: SettingsRow): Settings => ({
@@ -91,6 +120,7 @@ export const rowToSettings = (r: SettingsRow): Settings => ({
   recipientEmails: r.recipient_emails ?? [],
   taxRate: Number(r.tax_rate),
   defaultRate: Number(r.default_rate),
+  graceMinutes: r.grace_minutes ?? 15,
 });
 export const settingsToRow = (s: Settings): SettingsRow => ({
   id: 1,
@@ -100,6 +130,7 @@ export const settingsToRow = (s: Settings): SettingsRow => ({
   recipient_emails: s.recipientEmails,
   tax_rate: s.taxRate,
   default_rate: s.defaultRate,
+  grace_minutes: s.graceMinutes,
 });
 
 /** Supabase returns at most 1000 rows per request, so read in pages. */

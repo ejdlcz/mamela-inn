@@ -34,16 +34,20 @@ export default function RoomCard({
   onOpen,
 }: RoomCardProps) {
   const occupied = room.status === 'occupied';
+  // Guest overstayed and was removed automatically; the room is free but still flagged.
+  const flagged = !occupied && !!room.overstayRef;
+  const showGuest = occupied || flagged;
   const tiny = density === 'tiny';
   const dense = density !== 'comfortable';
   let look: (typeof LOOKS)[keyof typeof LOOKS] = LOOKS.vacant;
   let timeLabel = '';
 
-  if (occupied) {
+  if (showGuest) {
     const { overdue, h, m } = remaining(new Date(room.timeOut ?? now).getTime() - now.getTime());
-    look = overdue ? LOOKS.overdue : LOOKS.occupied;
+    look = flagged || overdue ? LOOKS.overdue : LOOKS.occupied;
     const hm = `${h}h ${pad2(m)}m`;
-    timeLabel = overdue ? (narrow ? `-${hm}` : `Overdue by ${hm}`) : narrow ? hm : `${hm} left`;
+    timeLabel =
+      flagged || overdue ? (narrow ? `-${hm}` : `Overdue by ${hm}`) : narrow ? hm : `${hm} left`;
   }
 
   const handleClick = () => {
@@ -98,7 +102,7 @@ export default function RoomCard({
         {room.number}
       </div>
 
-      {occupied ? (
+      {showGuest ? (
         // Phones: time left sits ABOVE the guest name, so if space runs out the name goes first.
         <div className="mt-auto flex min-w-0 flex-col-reverse gap-0.5 pt-1 sm:mt-3 sm:flex-col sm:gap-1">
           <div

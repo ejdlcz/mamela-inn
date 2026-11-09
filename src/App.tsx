@@ -5,6 +5,7 @@ import Header from './components/layout/Header';
 import OwnerDashboard from './components/owner/OwnerDashboard';
 import { BACKGROUND_MINUTES, INACTIVITY_MINUTES } from './config/defaults';
 import { useAuth } from './hooks/useAuth';
+import { useAutoCheckout } from './hooks/useAutoCheckout';
 import { useInactivityLogout } from './hooks/useInactivityLogout';
 import { useInnData } from './hooks/useInnData';
 import { useTheme } from './hooks/useTheme';
@@ -13,6 +14,7 @@ import type { View } from './types';
 
 function Shell() {
   const data = useInnData();
+  useAutoCheckout(data);
   const { role, loginFrontDesk, loginOwner, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [view, setView] = useState<View>('frontdesk');

@@ -7,13 +7,16 @@ import { useToast } from '../../hooks/useToast';
 import type { InnData } from '../../hooks/useInnData';
 import { findConflict } from '../../lib/bookings';
 import { fmtDateTime } from '../../lib/format';
+import { overstayMinutes } from '../../lib/overdue';
 import { phoneGridColumns, roomGridColumns } from '../../lib/layout';
 import type { Room, Transaction } from '../../types';
 import Modal from '../ui/Modal';
 import BookingCalendar from './BookingCalendar';
 import BookingChoiceModal from './BookingChoiceModal';
+import CancelReservationModal, { type CancelDetails } from './CancelReservationModal';
 import CheckInModal from './CheckInModal';
 import GuestInfoModal from './GuestInfoModal';
+import OverdueRoomModal from './OverdueRoomModal';
 import ReservationsList from './ReservationsList';
 import RoomCard from './RoomCard';
 
@@ -38,6 +41,9 @@ export default function FrontDesk({ data }: { data: InnData }) {
   const [showScheduled, setShowScheduled] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [infoRoomId, setInfoRoomId] = useState<string | null>(null);
+  const [overdueRoomId, setOverdueRoomId] = useState<string | null>(null);
+  /** reservation waiting for a cancellation reason */
+  const [cancelTarget, setCancelTarget] = useState<Transaction | null>(null);
 
   const activeTxnByRoom = useMemo(() => {
     const map: Record<string, Transaction> = {};
@@ -56,10 +62,39 @@ export default function FrontDesk({ data }: { data: InnData }) {
   );
 
   const infoRoom = infoRoomId ? rooms.find((r) => r.id === infoRoomId) : undefined;
+  const overdueRoom = overdueRoomId ? rooms.find((r) => r.id === overdueRoomId) : undefined;
 
   /* ---- room state helpers ------------------------------------------------ */
-  const occupy = (txn: Transaction, roomIds: string[]) =>
-    Promise.all(
+  /**
+   * A guest who overstayed was removed automatically and their room is flagged "Overdue".
+   * Once they are confirmed gone (or the room is rented again) record how long they
+   * overstayed and clear the flag on every room of that stay.
+   */
+  const finalizeOverstay = async (ref: string, at = new Date()) => {
+    const stay = txns.find((t) => t.ref === ref);
+    if (stay) {
+      await data.updateTxn({
+        ...stay,
+        actualTimeOut: at.toISOString(),
+        overstayMinutes: Math.max(stay.overstayMinutes ?? 0, overstayMinutes(stay.timeOut, at)),
+      });
+    }
+    await Promise.all(
+      rooms
+        .filter((r) => r.overstayRef === ref)
+        .map((r) =>
+          data.saveRoom({ ...r, overstayRef: null, guestName: null, txnId: null, timeOut: null }),
+        ),
+    );
+  };
+
+  const occupy = async (txn: Transaction, roomIds: string[]) => {
+    const flaggedRefs = new Set(
+      roomIds.map((id) => rooms.find((r) => r.id === id)?.overstayRef).filter(Boolean) as string[],
+    );
+    for (const ref of flaggedRefs) await finalizeOverstay(ref);
+
+    await Promise.all(
       roomIds.map((id) => {
         const room = rooms.find((r) => r.id === id);
         if (!room) return Promise.resolve();
@@ -69,9 +104,11 @@ export default function FrontDesk({ data }: { data: InnData }) {
           txnId: txn.ref,
           guestName: txn.guestName,
           timeOut: txn.timeOut,
+          overstayRef: null,
         });
       }),
     );
+  };
 
   const vacate = (roomIds: string[]) =>
     Promise.all(
@@ -84,6 +121,7 @@ export default function FrontDesk({ data }: { data: InnData }) {
           txnId: null,
           guestName: null,
           timeOut: null,
+          overstayRef: null,
         });
       }),
     );
@@ -91,6 +129,7 @@ export default function FrontDesk({ data }: { data: InnData }) {
   /* ---- actions ------------------------------------------------------------ */
   const openRoom = (room: Room) => {
     if (room.status === 'occupied') setInfoRoomId(room.id);
+    else if (room.overstayRef) setOverdueRoomId(room.id);
     else setChoice([room.id]);
   };
 
@@ -116,10 +155,12 @@ export default function FrontDesk({ data }: { data: InnData }) {
 
   const checkout = async (txn: Transaction) => {
     try {
+      const leftAt = new Date();
       await data.updateTxn({
         ...txn,
         status: 'completed',
-        actualTimeOut: new Date().toISOString(),
+        actualTimeOut: leftAt.toISOString(),
+        overstayMinutes: overstayMinutes(txn.timeOut, leftAt),
       });
       await vacate(txn.roomIds);
       setInfoRoomId(null);
@@ -158,12 +199,30 @@ export default function FrontDesk({ data }: { data: InnData }) {
     }
   };
 
-  const cancelReservation = async (txn: Transaction) => {
+  const confirmCancel = async (txn: Transaction, details: CancelDetails) => {
     try {
-      await data.updateTxn({ ...txn, status: 'cancelled' });
-      toast(`Reservation for ${txn.guestName} cancelled.`);
+      await data.updateTxn({
+        ...txn,
+        status: 'cancelled',
+        cancelReason: details.reason,
+        cancelNote: details.note || null,
+        refundAmount: details.refundAmount,
+        cancelledAt: new Date().toISOString(),
+      });
+      setCancelTarget(null);
+      toast(`Reservation for ${txn.guestName} cancelled. Refund: ₱${details.refundAmount}.`);
     } catch (e) {
       toast(`Could not cancel the reservation. ${errMsg(e)}`, 'error');
+    }
+  };
+
+  const confirmGuestLeft = async (room: Room) => {
+    try {
+      if (room.overstayRef) await finalizeOverstay(room.overstayRef);
+      setOverdueRoomId(null);
+      toast(`Room ${room.number} cleared. Overstay recorded.`);
+    } catch (e) {
+      toast(`Could not update the room. ${errMsg(e)}`, 'error');
     }
   };
 
@@ -223,7 +282,7 @@ export default function FrontDesk({ data }: { data: InnData }) {
         await activateReservation(t);
         afterCheckIn?.();
       }}
-      onCancel={cancelReservation}
+      onCancel={setCancelTarget}
     />
   );
 
@@ -264,7 +323,7 @@ export default function FrontDesk({ data }: { data: InnData }) {
             {/* Phones only: the scheduled list lives in a pop-up so it never crowds the rooms */}
             <button
               onClick={() => setShowScheduled(true)}
-              className="btn-outline h-11 flex-1 sm:hidden"
+              className="btn-outline h-11 flex-1 text-ink sm:hidden"
             >
               <ClipboardList size={16} /> Scheduled ({reservations.length})
             </button>
@@ -363,7 +422,7 @@ export default function FrontDesk({ data }: { data: InnData }) {
           now={now}
           onClose={() => setShowCalendar(false)}
           onCheckIn={activateReservation}
-          onCancel={cancelReservation}
+          onCancel={setCancelTarget}
         />
       )}
 
@@ -388,10 +447,32 @@ export default function FrontDesk({ data }: { data: InnData }) {
           room={infoRoom}
           txn={activeTxnByRoom[infoRoom.id] ?? null}
           rooms={rooms}
+          graceMinutes={settings.graceMinutes}
           onClose={() => setInfoRoomId(null)}
           onCheckout={checkout}
           onChangeRoom={changeRoom}
           onAddRoom={addRoom}
+        />
+      )}
+
+      {overdueRoom && (
+        <OverdueRoomModal
+          room={overdueRoom}
+          txn={txns.find((t) => t.ref === overdueRoom.overstayRef)}
+          onClose={() => setOverdueRoomId(null)}
+          onConfirmLeft={confirmGuestLeft}
+          onBook={(room) => {
+            setOverdueRoomId(null);
+            setChoice([room.id]);
+          }}
+        />
+      )}
+
+      {cancelTarget && (
+        <CancelReservationModal
+          txn={cancelTarget}
+          onClose={() => setCancelTarget(null)}
+          onConfirm={(details) => confirmCancel(cancelTarget, details)}
         />
       )}
 

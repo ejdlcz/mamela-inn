@@ -31,6 +31,14 @@ export default function Reports({ txns, settings }: ReportsProps) {
 
   const revenue = last7.reduce((sum, t) => sum + (Number(t.totalAmount) || 0), 0);
   const upcoming = txns.filter((t) => t.status === 'scheduled').length;
+  // Money handed back for reservations cancelled in the last 7 days.
+  const refunded = txns
+    .filter(
+      (t) =>
+        t.status === 'cancelled' &&
+        +new Date(t.cancelledAt ?? t.createdAt) >= Date.now() - 7 * 24 * 3_600_000,
+    )
+    .reduce((sum, t) => sum + (Number(t.refundAmount) || 0), 0);
   const recipients = [settings.ownerEmail, ...settings.recipientEmails].filter(Boolean).join(', ');
 
   const generate = async () => {
@@ -44,9 +52,10 @@ export default function Reports({ txns, settings }: ReportsProps) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-5">
         {stat('Stays, last 7 days', String(last7.length))}
         {stat('Revenue, last 7 days', fmtMoney(revenue))}
+        {stat('Refunded, last 7 days', fmtMoney(refunded))}
         {stat('Upcoming reservations', String(upcoming))}
         <div className="card p-5">
           <div className="label">Report recipients</div>

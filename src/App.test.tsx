@@ -20,6 +20,7 @@ async function checkIn(user: User, room: string, guest: string) {
   await user.click(await screen.findByRole('button', { name: `Room ${room}, Vacant` }));
   await user.click(screen.getByRole('button', { name: /check in now/i }));
   await user.type(screen.getByLabelText('Guest Name'), guest);
+  await user.click(screen.getByRole('button', { name: /^next/i }));
   await user.click(screen.getByRole('button', { name: 'Confirm Check-In' }));
 }
 
@@ -94,11 +95,12 @@ describe('front desk', () => {
     const user = await enterFrontDesk();
     await user.click(await screen.findByRole('button', { name: 'Room 101, Vacant' }));
     await user.click(screen.getByRole('button', { name: /check in now/i }));
+    await user.type(screen.getByLabelText('Guest Name'), 'Walk-in');
+    await user.click(screen.getByRole('button', { name: /^next/i }));
     expect(screen.getByText(/^now ·/i)).toBeTruthy();
     expect(screen.queryByText('Scheduled Date')).toBeNull();
 
     const before = Date.now();
-    await user.type(screen.getByLabelText('Guest Name'), 'Walk-in');
     await user.click(screen.getByRole('button', { name: 'Confirm Check-In' }));
     await screen.findByRole('button', { name: 'Room 101, Occupied' });
     const [txn] = JSON.parse(localStorage.getItem(STORAGE_KEYS.txns) ?? '[]');
@@ -109,6 +111,8 @@ describe('front desk', () => {
     const user = await enterFrontDesk();
     await user.click(await screen.findByRole('button', { name: 'Room 103, Vacant' }));
     await user.click(screen.getByRole('button', { name: /schedule a booking/i }));
+    await user.type(screen.getByLabelText('Guest Name'), 'Pat');
+    await user.click(screen.getByRole('button', { name: /^next/i }));
     expect(screen.getByText('Scheduled Date')).toBeTruthy();
     expect(screen.getByText('Scheduled Time')).toBeTruthy();
   });
@@ -121,6 +125,7 @@ describe('front desk', () => {
     await user.click(screen.getByRole('button', { name: /book selected \(2\)/i }));
     await user.click(screen.getByRole('button', { name: /check in now/i }));
     await user.type(screen.getByLabelText('Guest Name'), 'Group');
+    await user.click(screen.getByRole('button', { name: /^next/i }));
     await user.click(screen.getByRole('button', { name: 'Confirm Check-In' }));
 
     expect(await screen.findByRole('button', { name: 'Room 101, Occupied' })).toBeTruthy();
@@ -137,6 +142,7 @@ describe('front desk', () => {
     await user.click(screen.getByRole('button', { name: /schedule a booking/i }));
     await user.type(screen.getByLabelText('Guest Name'), 'Maria');
     await user.click(screen.getByRole('button', { name: '101' })); // add the busy room
+    await user.click(screen.getByRole('button', { name: /^next/i }));
     await user.click(screen.getByRole('button', { name: /save reservation/i }));
 
     expect((await screen.findByRole('alert')).textContent).toMatch(/already booked for Juan/);
@@ -148,6 +154,7 @@ describe('front desk', () => {
     await user.click(await screen.findByRole('button', { name: 'Room 105, Vacant' }));
     await user.click(screen.getByRole('button', { name: /schedule a booking/i }));
     await user.type(screen.getByLabelText('Guest Name'), 'Maria');
+    await user.click(screen.getByRole('button', { name: /^next/i }));
     await user.click(screen.getByRole('button', { name: /save reservation/i }));
 
     const side = await screen.findByRole('complementary', { name: /scheduled bookings/i });
@@ -206,6 +213,7 @@ describe('booking calendar', () => {
     await user.click(await screen.findByRole('button', { name: 'Room 105, Vacant' }));
     await user.click(screen.getByRole('button', { name: /schedule a booking/i }));
     await user.type(screen.getByLabelText('Guest Name'), 'Maria');
+    await user.click(screen.getByRole('button', { name: /^next/i }));
     await user.click(screen.getByRole('button', { name: /save reservation/i }));
     await screen.findByRole('complementary', { name: /scheduled bookings/i });
 
